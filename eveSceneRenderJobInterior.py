@@ -1038,6 +1038,9 @@ class EveSceneRenderJobInterior(SceneRenderJobBase):
 
             self.backgroundScene = blue.BluePythonWeakRef(scene)
 
+    def SuspendRendering(self):
+        self.Pause()
+
     def EnableSceneUpdate(self, isEnabled):
         if isEnabled:
             self.AddStep("UPDATE_SCENE", trinity.TriStepUpdate(self.GetScene()))
