@@ -35,11 +35,13 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
     ]
     renderStepOrder += SceneRenderJobSpace.renderStepOrder
     renderStepOrder += [
+        "UPDATE_BRACKETS",
         "POP_RENDER_TARGET",
         "POP_DEPTH_STENCIL",
         "COPY_TO_BLIT_TEXTURE", 
         "PUSH_BLIT_DEPTH",
         "SET_BLIT_VIEWPORT",
+        "SET_BLENDMODE",
         "FINAL_BLIT_EMBEDDED",
         "POP_BLIT_DEPTH",
     ]
