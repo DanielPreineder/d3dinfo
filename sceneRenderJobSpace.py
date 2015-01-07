@@ -290,7 +290,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             return
         if self.secondaryLighting:
             scene.shLightingManager = trinity.Tr2ShLightingManager()
-            scene.shLightingManager.intensity = 3
+            scene.shLightingManager.intensity = 8
         else:
             scene.shLightingManager = None
 
