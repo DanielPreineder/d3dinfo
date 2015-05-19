@@ -55,7 +55,7 @@ def _ImportDll():
     """
     triPlatform = _os.getenv("TRINITYPLATFORM", DEFAULT_TRI_PLATFORM)
     triType = _os.getenv("TRINITYTYPE", DEFAULT_TRI_TYPE)
-    disablePlatformCheck = False
+    disablePlatformCheck = _os.getenv("TRINITYNOPLATFORMCHECK")
 
     for arg in _blue.pyos.GetArg():
         arg = arg.lower()
