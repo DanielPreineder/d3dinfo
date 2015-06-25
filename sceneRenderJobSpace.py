@@ -464,7 +464,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         
 
         # We need the standard clear
-        self.AddStep("CLEAR", trinity.TriStepClear((0.0,0.0,0.0,0.0), 1.0))
+        self.AddStep("CLEAR", trinity.TriStepClear((0.0,0.0,0.0,0.0), 0.0))
         
         # Setup tools steps if we have a tools scene
         if self.clientToolsScene is not None:
@@ -591,8 +591,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             if _singletons.platform == 'dx11':
                 if self.customDepthStencil is not None:
                     self.depthTexture = self.customDepthStencil
-                elif self._TargetDiffers(self.depthTexture, "trinity.Tr2DepthStencil", trinity.DEPTH_STENCIL_FORMAT.READABLE, 0, width, height):
-                    self.depthTexture = rtm.GetDepthStencilAL(width, height, trinity.DEPTH_STENCIL_FORMAT.READABLE)
+                elif self._TargetDiffers(self.depthTexture, "trinity.Tr2DepthStencil", trinity.DEPTH_STENCIL_FORMAT.D32F, 0, width, height):
+                    self.depthTexture = rtm.GetDepthStencilAL(width, height, trinity.DEPTH_STENCIL_FORMAT.D32F)
                     if self.depthTexture is not None and self.depthTexture.IsReadable():
                         self.depthTexture.name = 'sceneRenderJobSpace.depthTexture'
                     else:

@@ -933,10 +933,10 @@ class EveSceneRenderJobInterior(SceneRenderJobBase):
 
             # In this case, this is the initial clear, so clear everything
             # Prepass clear will wipe this out again
-            self.AddStep("CLEAR_BACKGROUND_RT",  trinity.TriStepClear((0, 0, 0, 0), 1.0, 0))
+            self.AddStep("CLEAR_BACKGROUND_RT",  trinity.TriStepClear((0, 0, 0, 0), 0.0, 0))
 
             # Clear the depth and stencil after rendering the background
-            self.AddStep("CLEAR_BACKGROUND_DEPTH", trinity.TriStepClear(None, 1.0, 0))
+            self.AddStep("CLEAR_BACKGROUND_DEPTH", trinity.TriStepClear(None, 0.0, 0))
 
 
             # We don't clear the final render target if we're rendering a background scene before it

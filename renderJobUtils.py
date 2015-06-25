@@ -117,28 +117,4 @@ def DeviceSupportsRenderTargetFormat( format ):
         format )
 
 
-def ConvertDepthFormatToALFormat(format):
-    # convert from old DX9 style dsFormat to new style DEPTH_STENCIL_FORMAT
-    td = _trinity.DEPTH_STENCIL_FORMAT
-
-    dsLookup = {
-                    _trinity.TRIFMT_D24S8          : td.D24S8,
-                    _trinity.TRIFMT_D24X8          : td.D24X8,
-                    _trinity.TRIFMT_D24FS8         : td.D24FS8,
-                    _trinity.TRIFMT_D32            : td.D32,
-                    _trinity.TRIFMT_INTZ           : td.READABLE,
-
-                    _trinity.TRIFMT_D16_LOCKABLE   : td.D16_LOCKABLE,
-                    _trinity.TRIFMT_D15S1          : td.D15S1,
-                    _trinity.TRIFMT_D24X4S4        : td.D24X4S4,
-                    _trinity.TRIFMT_D16            : td.D16,
-                    _trinity.TRIFMT_D32F_LOCKABLE  : td.D32F_LOCKABLE,
-                    _trinity.TRIFMT_D24FS8         : td.D24FS8
-               }
-
-    dsFormatAL = dsLookup.get(format, td.AUTO)
-    
-    return dsFormatAL
-
-
 renderTargetManager = RenderTargetManager()
