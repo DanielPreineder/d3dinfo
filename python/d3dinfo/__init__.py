@@ -251,7 +251,16 @@ def CreatePythonBinding(cs, src, srcAttr, dst, dstAttr):
     return binding
 
 
+_isShaderLibraryInitialized = False
+_isShaderLibraryPopulated = False
+
+
 def PopulateShaderLibraryFromFiles():
+    global _isShaderLibraryInitialized, _isShaderLibraryPopulated
+    if _isShaderLibraryInitialized:
+        return
+    _isShaderLibraryInitialized = True
+
     def _AddToShaderLibrary(filepath):
         highLevelShader = blue.resMan.LoadObject(filepath)
         if highLevelShader is not None:
@@ -275,6 +284,7 @@ def PopulateShaderLibraryFromFiles():
                 filepath = path + '/' + filename + ".red"
                 filesToLoad.add(filepath)
     uthread2.map(_AddToShaderLibrary, filesToLoad)
+    _isShaderLibraryPopulated = True
 
 SHADERLIBRARYFOLDER = "res:/Graphics/Shaders"
 SHADERLIBRARYFILENAME = SHADERLIBRARYFOLDER + "/ShaderDescriptions.red"
@@ -282,10 +292,20 @@ SHADERLIBRARYFILENAME = SHADERLIBRARYFOLDER + "/ShaderDescriptions.red"
 @telemetry.ZONE_FUNCTION
 def PopulateShaderLibrary():
     if blue.paths.exists(SHADERLIBRARYFILENAME):
+        global _isShaderLibraryInitialized, _isShaderLibraryPopulated
+        if _isShaderLibraryInitialized:
+            return
+        _isShaderLibraryInitialized = True
+
         shaders = blue.resMan.LoadObject(SHADERLIBRARYFILENAME)
         shaderManager.shaderLibrary = shaders.shaderLibrary
+        _isShaderLibraryPopulated = True
     else:
         PopulateShaderLibraryFromFiles()
+
+
+def IsShaderLibraryPopulated():
+    return _isShaderLibraryPopulated
 
 
 def IsMsaaTypeSupported(msaa_type, formats):
