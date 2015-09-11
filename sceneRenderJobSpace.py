@@ -91,7 +91,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         # Active scenes
         self.scene = None
         self.clientToolsScene = None
-        
+
+        self.taaPath = "res:/fisfx/postprocess/taa.red"
         # The active eve space scene key(default, map etc.)
         self.activeSceneKey = None
         
@@ -104,6 +105,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.depthTexture = None
         self.blitTexture = None
         self.distortionTexture = None
+        self.velocityTexture = None
         self.accumulationBuffer = None
         
         # The shadow map
@@ -270,6 +272,19 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.GetScene().distortionTexture = self.distortionTexture
 
 
+    def _SetVelocityMap(self):
+        """
+        Set depth map to the scene
+        """
+        if not self.enabled:
+            return
+        if self.GetScene() is None:
+            return
+
+        if hasattr(self.GetScene(), "velocityMap"):
+            self.GetScene().velocityMap = self.velocityTexture
+
+
     def _SetShadowMap(self):
         """
         Set shadow map to the scene
@@ -383,6 +398,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         taaTriTextureRes.SetFromRenderTarget(self.accumulationBuffer)
         self.taaJob.SetPostProcessVariable("TAA", "LastFrame", taaTriTextureRes)
 
+        velocityTriTextureRes = trinity.TriTextureRes()
+        velocityTriTextureRes.SetFromRenderTarget(self.velocityTexture)
+        self.taaJob.SetPostProcessVariable("TAA", "VelocityMap", velocityTriTextureRes)
+
 
     def _CreateDepthPass(self):
         rj = trinity.TriRenderJob()
@@ -493,6 +512,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         self.distortionTexture = None
         self.accumulationBuffer = None
+        self.velocityTexture = None
 
         self.postProcessingJob.Release()
         self.distortionJob.Release()
@@ -502,6 +522,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.backgroundDistortionJob.SetPostProcessVariable("Distortion", "TexDistortion", None)
         self.taaJob.Release()
         self.taaJob.SetPostProcessVariable("TAA", "LastFrame", None)
+        self.taaJob.SetPostProcessVariable("TAA", "VelocityMap", None)
         self.taaJob.SetPostProcessPSData(None)
         self._SetDistortionMap()
 
@@ -607,7 +628,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.depthTexture = None
 
         # blitTexture
-        useBlitTexture = (self.usePostProcessing or self.distortionEffectsEnabled)
+        useBlitTexture = (self.usePostProcessing or self.distortionEffectsEnabled or self.taaEnabled)
         useBlitTexture = useBlitTexture or (self.hdrEnabled and self.msaaEnabled)
         blitFormat = trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT if self.hdrEnabled else self.bbFormat
         if useBlitTexture and self._TargetDiffers(self.blitTexture, "trinity.Tr2RenderTarget", blitFormat, 0, width, height):
@@ -650,6 +671,16 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         else:
             self.accumulationBuffer = None
 
+        if self.taaEnabled:
+            if self.msaaEnabled:
+                self.velocityTexture = rtm.GetRenderTargetMsaaAL(width, height, trinity.PIXEL_FORMAT.R16G16_FLOAT, msaaType, 0, 987)
+                self.velocityTexture.name = "VelocityMapMSAA"
+            else:
+                self.velocityTexture = rtm.GetRenderTargetAL(width, height, 1, trinity.PIXEL_FORMAT.R16G16_FLOAT, 987)
+                self.velocityTexture.name = "VelocityMap"
+        else:
+            self.velocityTexture = None
+
 
     def _TargetDiffers(self, target, blueType, format, msType=0, width=0, height=0):
         if target is None:
@@ -691,6 +722,11 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if "aaQuality" not in self.overrideSettings:
             self.antiAliasingQuality = self.aaQuality = gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING)
 
+        self.taaEnabled = gfxsettings.Get(gfxsettings.GFX_TAA) and _singletons.platform == 'dx11' and self.useDepth
+        if self.taaEnabled and self.prepared and self.useDepth:
+            self.taaJob.AddPostProcess("TAA", self.taaPath)
+        else:
+            self.taaJob.RemovePostProcess("TAA")
         # Graphics Settings: Again, avoiding this call would be preferrable, 
         # perhaps a util function in evegraphics
         self.msaaType = self._GetMSAATypeFromQuality(self.antiAliasingQuality)
@@ -753,7 +789,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     def EnableTAA(self, enable):
         self.taaEnabled = enable
         if enable and self.prepared and self.useDepth:
-            self.taaJob.AddPostProcess("TAA", "res:/fisfx/postprocess/taa.red")
+            self.taaJob.AddPostProcess("TAA", self.taaPath)
         else:
             self.taaJob.RemovePostProcess("TAA")
         self.ApplyPerformancePreferencesToScene()
@@ -871,6 +907,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._SetShadowMap()
         self._SetDepthMap()
         self._SetDistortionMap()
+        self._SetVelocityMap()
         self._SetSecondaryLighting()
         scene = self.GetScene()
         if scene is None:
