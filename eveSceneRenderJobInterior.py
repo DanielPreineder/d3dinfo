@@ -1201,10 +1201,10 @@ class EveSceneRenderJobInterior(SceneRenderJobBase):
         # handle ILR correctly. Do it here instead of in EnableILR
         # because EnableILR could theoretically be called before
         # the device is created.
-        if not blue.win32.IsTransgaming():
+        if not blue.sysinfo.isTransgaming:
             try:
                 info = _singletons.adapters.GetAdapterInfo(_singletons.device.adapter)
-                if info.vendorID == 4098 and blue.os.osMajor <= 5:
+                if info.vendorID == 4098 and blue.sysinfo.os.majorVersion <= 5:
                     self.ilrEnabled = False
             except:
                 pass
