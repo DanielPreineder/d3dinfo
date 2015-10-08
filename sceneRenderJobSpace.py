@@ -849,7 +849,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
     def _SetSettingsBasedOnPerformancePreferences(self):
         self.msaaQuality = self._GetMSAAQualityFromAAQuality(self.aaQuality)
-        self.antiAliasingEnabled = self.msaaQuality > 0 or self.useFXAA
+        self.antiAliasingEnabled = self.msaaQuality > 0 or (self.useFXAA and self.aaQuality != gfxsettings.AA_QUALITY_DISABLED)
         self.msaaType = self._GetMSAATypeFromQuality(self.aaQuality)
         self.fxaaQuality = self._GetFXAAQuality(self.aaQuality)
 
