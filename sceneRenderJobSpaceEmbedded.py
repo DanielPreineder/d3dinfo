@@ -64,6 +64,7 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
         
         SceneRenderJobSpace._ManualInit(self, name)
         self.updateJob = None
+        self.useTAA = False
 
     def SetupStencilBlitEffect(self):
         self.stencilBlitEffect = trinity.Tr2Effect()

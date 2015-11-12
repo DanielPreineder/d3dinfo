@@ -123,6 +123,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.antiAliasingEnabled = False
         self.aaQuality = 0
         self.useFXAA = False
+        self.useTAA = True
         self.fxaaEnabled = False
         self.fxaaQuality = "FXAA_High"
         self.msaaEnabled = False
@@ -721,7 +722,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if "aaQuality" not in self.overrideSettings:
             self.msaaQuality = self._GetMSAAQualityFromAAQuality(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
 
-        self.taaEnabled = gfxsettings.IsTAAEnabled(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING)) and _singletons.platform == 'dx11' and self.useDepth
+        taaEnabled = gfxsettings.IsTAAEnabled(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
+        self.taaEnabled = taaEnabled and _singletons.platform == 'dx11' and self.useDepth and self.useTAA
         if self.taaEnabled and self.prepared:
             self.taaJob.AddPostProcess("TAA", self.taaPath)
         else:
