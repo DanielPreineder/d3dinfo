@@ -171,7 +171,6 @@ class NumericParameter(Parameter):
         return param, 'value'
 
     def _ApplyToEffect(self, obj, name):
-        print self.name, self.value
         obj.value = self.value
 
     def GetValue(self):
@@ -472,6 +471,7 @@ class PostProcess(object):
         Loads a YAML file with parameter values
         :param path: path to parameter YAML file
         :jessica-file-open path: YAML files (*.yaml)|*.yaml
+        :jessica-favorite:
         """
         params = yamlext.load(blue.paths.GetFileContentsWithYield(path))
         for name, value in params.iteritems():
@@ -483,6 +483,7 @@ class PostProcess(object):
         Save parameter values into a YAML file
         :param path: path to parameter YAML file
         :jessica-file-save path: YAML files (*.yaml)|*.yaml
+        :jessica-favorite:
         """
         params = {}
         for name, param in self._parameters.iteritems():
