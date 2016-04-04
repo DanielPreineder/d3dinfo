@@ -250,3 +250,7 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
             return self.finalTexture
 
         return SceneRenderJobSpace._GetRTForDepthPass(self)
+
+    def ApplyBaseSettings(self):
+        SceneRenderJobSpace.ApplyBaseSettings(self)
+        self.gpuParticlesEnabled = False
