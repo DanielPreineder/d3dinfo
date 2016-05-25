@@ -1,4 +1,5 @@
 import ast
+import math
 
 import blue
 import trinity
@@ -69,7 +70,7 @@ def _EvaluateCondition(condition, parameters):
     :param parameters: dict of parameters (Parameter objects)
     :return: result of evaluating expression
     """
-    return eval(condition, {'platform': trinity.platform}, _LazyParameters(parameters))
+    return eval(condition, {'platform': trinity.platform, 'math': math}, _LazyParameters(parameters))
 
 
 class Parameter(object):
