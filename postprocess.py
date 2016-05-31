@@ -1,9 +1,35 @@
 import ast
+import logging
 import math
+import re
 
 import blue
 import trinity
 import yamlext
+
+
+def _GetValueType(value):
+    """
+    Guesses parameter type based on its value
+    :param value: parameter value
+    :return: parameter type name
+    """
+    if isinstance(value, (str, unicode)):
+        return 'texture'
+    if isinstance(value, (tuple, list)):
+        if len(value) == 2:
+            return 'vector2'
+        elif len(value) == 3:
+            return 'vector3'
+        elif len(value) == 4:
+            return 'vector4'
+        else:
+            raise ValueError()
+    if isinstance(value, bool):
+        return 'bool'
+    if isinstance(value, (float, int, long)):
+        return 'float'
+    raise ValueError()
 
 
 def _GetParameterType(data):
@@ -14,22 +40,7 @@ def _GetParameterType(data):
     """
     if 'type' in data:
         return data['type']
-    if isinstance(data['value'], (str, unicode)):
-        return 'texture'
-    if isinstance(data['value'], tuple):
-        if len(data['value']) == 2:
-            return 'vector2'
-        elif len(data['value']) == 3:
-            return 'vector3'
-        elif len(data['value']) == 4:
-            return 'vector4'
-        else:
-            raise ValueError()
-    if isinstance(data['value'], bool):
-        return 'bool'
-    if isinstance(data['value'], (float, int, long)):
-        return 'float'
-    raise ValueError()
+    return _GetValueType(data['value'])
 
 
 def _GetConditionDependencies(condition):
@@ -63,14 +74,25 @@ class _LazyParameters(object):
         return self._parameters[item].GetValue()
 
 
-def _EvaluateCondition(condition, parameters):
+def _EvaluateString(expression, parameters):
     """
-    Evaluates a condition expression
-    :param condition: condition expression string
+    Evaluates a string using parameters as variables
+    :param expression: condition expression string
     :param parameters: dict of parameters (Parameter objects)
     :return: result of evaluating expression
     """
-    return eval(condition, {'platform': trinity.platform, 'math': math}, _LazyParameters(parameters))
+    try:
+        return eval(expression, {'platform': trinity.platform, 'math': math}, _LazyParameters(parameters))
+    except BaseException as e:
+        params = []
+        for k, v in parameters.iteritems():
+            try:
+                params.append('%s = %s' % (k, v.GetValue()))
+            except:
+                params.append('%s = ???' % k)
+                pass
+        logging.exception('Exception when evaluating expression %s with parameters %s', expression, '\n'.join(params))
+        raise e
 
 
 class Parameter(object):
@@ -151,6 +173,8 @@ class NumericParameter(Parameter):
     def __init__(self, name, data):
         super(NumericParameter, self).__init__(name, data)
         self.value = data['value']
+        if isinstance(self.value, list):
+            self.value = tuple(self.value)
         self.currentValue = self.value
         if self._type == 'float':
             self.paramType = trinity.Tr2FloatParameter
@@ -184,7 +208,7 @@ class NumericParameter(Parameter):
 
     def UpdateValue(self, parameters):
         if isinstance(self.value, (str, unicode)):
-            self.currentValue = _EvaluateCondition(self.value, parameters)
+            self.currentValue = _EvaluateString(self.value, parameters)
         else:
             self.currentValue = self.value
         super(NumericParameter, self).UpdateValue(parameters)
@@ -420,7 +444,7 @@ class ConditionParameter(Parameter):
         self._dependencies = [self.true, self.false] + _GetConditionDependencies(data['condition'])
 
     def UpdateValue(self, parameters):
-        if _EvaluateCondition(self.condition, parameters):
+        if _EvaluateString(self.condition, parameters):
             active = parameters[self.true]
         else:
             active = parameters[self.false]
@@ -481,6 +505,10 @@ def TopoSort(dependencies):
                 if item not in ordered}
     if data:
         raise RuntimeError("A cyclic dependency exists amongst %r" % dependencies)
+
+
+def _IsIdentifier(s):
+    return re.match("^[_A-Za-z][_a-zA-Z0-9]*$", s)
 
 
 class PostProcess(object):
@@ -644,7 +672,7 @@ steps:
         used = {k: False for k in self._parameters.iterkeys()}
         for params, condition, steps in self._stepDependencies:
             if condition:
-                enabled = True if _EvaluateCondition(condition, self._parameters) else False
+                enabled = True if _EvaluateString(condition, self._parameters) else False
             else:
                 enabled = True
             if params.intersection(changedParams):
@@ -683,12 +711,12 @@ steps:
                 del self._parameters[k]
 
         for key, value in data.get('parameters', {}).iteritems():
-            pt = PARAMETER_TYPES[_GetParameterType(value)]
-            self._parameters[key] = pt(key, value)
-            self._dependencies[key] = set()
-            for each in self._parameters[key].GetDependencies():
-                self._dependencies[key].add(each)
-            self.__members__.append(key)
+            self._AddVariable(key, value)
+        self.__members__.sort()
+
+        self._UpdateParameters()
+
+        tempVars = self._CreateTempVariables(data)
 
         self._UpdateParameters()
 
@@ -714,18 +742,22 @@ steps:
             if 'parameters' in each:
                 for key, value in each['parameters'].iteritems():
                     if isinstance(value, basestring):
+                        if value in tempVars:
+                            value = tempVars[value]
                         self._parameters[value].Bind(step, key)
                         usedParameters.add(value)
                     else:
                         setattr(step, key, value)
             if 'effectParameters' in each:
                 for key, value in each['effectParameters'].iteritems():
+                    if value in tempVars:
+                        value = tempVars[value]
                     self._parameters[value].Bind(step.effect, key)
                     usedParameters.add(value)
 
             steps = [step]
             if 'condition' in each:
-                if not _EvaluateCondition(each['condition'], self._parameters):
+                if not _EvaluateString(each['condition'], self._parameters):
                     step.enabled = False
             for indx, rt in each.get('renderTargets', {}).iteritems():
                 setrt = trinity.TriStepSetRenderTarget(self._parameters[rt].GetValue())
@@ -742,6 +774,31 @@ steps:
                 self._stepDependencies.append((usedParameters, None, steps))
 
         self._UpdateParameters()
+
+    def _CreateTempVariables(self, data):
+        tempVars = {}
+        for each in data.get('steps', []):
+            for key, value in each.get('parameters', {}).iteritems():
+                if isinstance(value, basestring) and not _IsIdentifier(value):
+                    name = '_ppTemp%s' % len(tempVars)
+                    val = _EvaluateString(value, self._parameters)
+                    self._AddVariable(name, {'value': value, 'type': _GetValueType(val)})
+                    tempVars[value] = name
+            for key, value in each.get('effectParameters', {}).iteritems():
+                if isinstance(value, basestring) and not _IsIdentifier(value):
+                    name = '_ppTemp%s' % len(tempVars)
+                    val = _EvaluateString(value, self._parameters)
+                    self._AddVariable(name, {'value': value, 'type': _GetValueType(val)})
+                    tempVars[value] = name
+        return tempVars
+
+    def _AddVariable(self, name, description):
+        pt = PARAMETER_TYPES[_GetParameterType(description)]
+        self._parameters[name] = pt(name, description)
+        self._dependencies[name] = set()
+        for each in self._parameters[name].GetDependencies():
+            self._dependencies[name].add(each)
+        self.__members__.append(name)
 
     def __getattr__(self, item):
         if item in self._parameters:
