@@ -576,7 +576,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.hdrEnabled = currentSettings["hdrEnabled"]
         self.gpuParticlesEnabled = currentSettings.get("gpuParticles", True)
 
-        self.secondaryLighting = self.distortionEffectsEnabled = self.useDepth = trinity.GetShaderModel().endswith("DEPTH")
+        isDepth = trinity.GetShaderModel().endswith("DEPTH")
+        self.secondaryLighting = self.distortionEffectsEnabled = isDepth
+        self.useDepth = isDepth or _singletons.platform == 'dx11'
+
         trinity.settings.SetValue('eveSpaceSceneDynamicLighting',
                                   trinity.GetShaderModel().endswith("DEPTH") and _singletons.platform == 'dx11')
 
@@ -738,7 +741,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.msaaQuality = self._GetMSAAQualityFromAAQuality(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
 
         taaEnabled = gfxsettings.IsTAAEnabled(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
-        self.taaEnabled = taaEnabled and _singletons.platform == 'dx11' and self.useDepth and self.useTAA
+        self.taaEnabled = taaEnabled and _singletons.platform == 'dx11' and trinity.GetShaderModel().endswith("DEPTH") and self.useTAA
         if self.taaEnabled and self.prepared:
             self.taaJob.AddPostProcess("TAA", self.taaPath)
         else:
@@ -902,7 +905,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.distortionJob.AddPostProcess("Distortion", "res:/fisfx/postprocess/distortion.red")
             self.backgroundDistortionJob.AddPostProcess("Distortion", "res:/fisfx/postprocess/distortion.red")
 
-        if self.taaEnabled and self.useDepth:
+        if self.taaEnabled and trinity.GetShaderModel().endswith("DEPTH"):
             self.taaJob.AddPostProcess("TAA", "res:/fisfx/postprocess/taa.red")
         else:
             self.taaJob.RemovePostProcess("TAA")
