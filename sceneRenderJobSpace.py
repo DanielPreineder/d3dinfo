@@ -149,6 +149,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.backgroundDistortionJob = evePostProcess.EvePostProcessingJob()
 
         self.sceneDesaturation = SceneDesaturation(self.postProcessingJob)
+        self.sceneFadeOut = SceneFadeOut(self.postProcessingJob)
+        self.sceneFadeOut.Enable()
 
         self.overrideSettings = {}
 
@@ -1057,13 +1059,14 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         pass
 
 
-class SceneDesaturation(object):
-    attrName = "SaturationFactor"
-
+class ScenePostProcessWrapper(object):
+    attrName = "None"
+    ppType = None
+    initial_value = 1.0
 
     def __init__(self, ppJob):
         self.ppJob = ppJob
-        self._value = 1.0
+        self._value = self.initial_value
 
     @property
     def value(self):
@@ -1072,10 +1075,21 @@ class SceneDesaturation(object):
     @value.setter
     def value(self, value):
         self._value = value
-        self.ppJob.SetPostProcessVariable(evePostProcess.POST_PROCESS_DESATURATE, self.attrName, value)
+        self.ppJob.SetPostProcessVariable(self.ppType, self.attrName, value)
 
     def Disable(self):
-        self.ppJob.RemovePostProcess(evePostProcess.POST_PROCESS_DESATURATE)
+        self.ppJob.RemovePostProcess(self.ppType)
 
     def Enable(self):
-        self.ppJob.AddPostProcess(evePostProcess.POST_PROCESS_DESATURATE)
+        self.ppJob.AddPostProcess(self.ppType)
+
+
+class SceneDesaturation(ScenePostProcessWrapper):
+    attrName = "SaturationFactor"
+    ppType = evePostProcess.POST_PROCESS_DESATURATE
+
+
+class SceneFadeOut(ScenePostProcessWrapper):
+    attrName = "Influence"
+    ppType = evePostProcess.POST_PROCESS_FADE_OUT
+    initial_value = 0.0, 1.0, 1.0, 1.0
