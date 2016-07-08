@@ -528,6 +528,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.distortionJob.Release()
         self.backgroundDistortionJob.Release()
         self.sceneDesaturation.Disable()
+        self.sceneFadeOut.Disable()
         self.distortionJob.SetPostProcessVariable("Distortion", "TexDistortion", None)
         self.backgroundDistortionJob.SetPostProcessVariable("Distortion", "TexDistortion", None)
         self.taaJob.Release()
