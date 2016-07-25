@@ -39,6 +39,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         "PRESENT_SWAPCHAIN",
         "SET_SWAPCHAIN_RT",
         "SET_SWAPCHAIN_DEPTH",
+        "SET_UPDATE_VIEW",
+        "SET_UPDATE_PROJECTION",
         "UPDATE_PHYSICS",
         "UPDATE_SCENE",
         "SET_CUSTOM_RT",
@@ -227,15 +229,25 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if camera is None and view is None and projection is None:
             self.RemoveStep("SET_VIEW")
             self.RemoveStep("SET_PROJECTION")
+            self.RemoveStep("SET_UPDATE_VIEW")
+            self.RemoveStep("SET_UPDATE_PROJECTION")
             return
 
         if camera is not None:
             self.AddStep("SET_VIEW", trinity.TriStepSetView(None, camera))
+            self.AddStep("SET_UPDATE_VIEW", trinity.TriStepSetView(None, camera))
+            self._SetUpdateStep(trinity.TriStepSetView(None, camera), "SET_VIEW")
             self.AddStep("SET_PROJECTION", trinity.TriStepSetProjection(camera.projectionMatrix))
+            self.AddStep("SET_UPDATE_PROJECTION", trinity.TriStepSetProjection(camera.projectionMatrix))
+            self._SetUpdateStep(trinity.TriStepSetProjection(camera.projectionMatrix), "SET_PROJECTION")
         if view is not None:
             self.AddStep("SET_VIEW", trinity.TriStepSetView(view))
+            self.AddStep("SET_UPDATE_VIEW", trinity.TriStepSetView(view))
+            self._SetUpdateStep(trinity.TriStepSetView(view), "SET_VIEW")
         if projection is not None:
             self.AddStep("SET_PROJECTION", trinity.TriStepSetProjection(projection))
+            self.AddStep("SET_UPDATE_PROJECTION", trinity.TriStepSetProjection(projection))
+            self._SetUpdateStep(trinity.TriStepSetProjection(projection), "SET_PROJECTION")
     
 
     def SetActiveScene(self, scene, key=None):
@@ -448,6 +460,30 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if backgroundJob is not None:
             backgroundJob.job.steps[0].scene = scene
 
+    def _FindUpdateStep(self, key):
+        for each in self.updateJob.steps:
+            if each.name == key:
+                return each
+
+    def _CreateUpdateStep(self, step, name):
+        self.updateJob.steps.append(step)
+        step.name = name
+
+    def _CreateUpdateSteps(self):
+        self._CreateUpdateStep(trinity.TriStepSetView(), "SET_VIEW")
+        self._CreateUpdateStep(trinity.TriStepSetProjection(), "SET_PROJECTION")
+        self._CreateUpdateStep(trinity.TriStepUpdate(self.GetScene()), "UPDATE_SCENE")
+
+    def _SetUpdateStep(self, step, name):
+        if self.updateJob is None:
+            return
+        step.name = name
+        idx = 0
+        for i, each in enumerate(self.updateJob.steps):
+            if each.name == name:
+                idx = i
+                break
+        self.updateJob.steps[idx] = step
 
     def _SetScene(self, scene):
         """
@@ -456,7 +492,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.currentMultiViewStageKey
         if self.updateJob is not None:
             if len(self.updateJob.steps) > 0:
-                self.updateJob.steps[0].object = scene
+                self._FindUpdateStep("UPDATE_SCENE").object = scene
         else:
             self.SetStepAttr("UPDATE_SCENE", 'object', scene)
         self.SetStepAttr("RENDER_MAIN_PASS", 'scene', scene) 
@@ -478,10 +514,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         # Scene update and render
         if self.updateJob is not None:
             if len(self.updateJob.steps) == 0:
-                self.updateJob.steps.append(trinity.TriStepUpdate(self.GetScene()))
-                self.updateJob.steps[0].name = "UPDATE_SCENE"
+                self._CreateUpdateSteps()
             else:
-                self.updateJob.steps[0] = trinity.TriStepUpdate(self.GetScene())
+                self._SetUpdateStep(trinity.TriStepUpdate(self.GetScene(), "UPDATE_SCENE"))
         else:
             self.AddStep("UPDATE_SCENE", trinity.TriStepUpdate(self.GetScene()))
         self.AddStep("BEGIN_RENDER", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_BEGIN_RENDER))
@@ -1044,10 +1079,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if self.updateJob:
             if isEnabled:
                 if len(self.updateJob.steps) == 0:
-                    self.updateJob.steps.append(trinity.TriStepUpdate(self.GetScene()))
-                    self.updateJob.steps[0].name = "UPDATE_SCENE"
+                    self._CreateUpdateSteps()
                 else:
-                    self.updateJob.steps[0] = trinity.TriStepUpdate(self.GetScene())
+                    self._SetUpdateStep(trinity.TriStepUpdate(self.GetScene()), "UPDATE_SCENE")
             elif len(self.updateJob.steps) > 0:
                 del self.updateJob.steps[0]
         else:
