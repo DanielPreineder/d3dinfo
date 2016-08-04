@@ -220,6 +220,13 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         else:
             return self.clientToolsScene.object
         
+    def SetCameraView(self, view):
+        super(SceneRenderJobSpace, self).SetCameraView(view)
+        self._SetUpdateStep(trinity.TriStepSetView(view), "SET_VIEW")
+
+    def SetCameraProjection(self, proj):
+        super(SceneRenderJobSpace, self).SetCameraProjection(proj)
+        self._SetUpdateStep(trinity.TriStepSetProjection(proj), "SET_PROJECTION")
 
     def SetActiveCamera(self, camera=None, view=None, projection=None):
         """
