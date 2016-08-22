@@ -957,7 +957,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         elif self.postProcessingQuality == 2:
             self.postProcess.Bloom = True
             self.postProcess.Desaturate = True
-            self.postProcess.DynamicExposure = True
+            self.postProcess.DynamicExposure = _singletons.platform == 'dx11'
             self.postProcess.FilmGrain = True
             self.postProcess.Tonemapping = True
             self.postProcess.FogEnabled = True
