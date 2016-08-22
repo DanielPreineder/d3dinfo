@@ -73,6 +73,9 @@ class _LazyParameters(object):
     def __getitem__(self, item):
         return self._parameters[item].GetValue()
 
+    def items(self):
+        return [(k, v.GetValue()) for k, v in self._parameters.iteritems()]
+
 
 def _EvaluateString(expression, parameters):
     """
@@ -324,7 +327,7 @@ class BuiltinRenderTargetParameter(Parameter):
         self.texture.SetFromRenderTarget(self.rt)
 
     def GetValue(self):
-        return self.rt
+        return self.rt or trinity.Tr2RenderTarget()
 
     def SetValue(self, value):
         self.rt = value

@@ -941,27 +941,18 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.postProcess.Desaturate = False
             self.postProcess.DynamicExposure = False
             self.postProcess.FilmGrain = False
-            self.postProcess.Fog = False
-            self.postProcess.GodRays = False
-            self.postProcess.Lut = False
             self.postProcess.Tonemapping = False
         elif self.postProcessingQuality == 1:
             self.postProcess.Bloom = True
             self.postProcess.Desaturate = True
             self.postProcess.DynamicExposure = False
             self.postProcess.FilmGrain = False
-            self.postProcess.Fog = False
-            self.postProcess.GodRays = False
-            self.postProcess.Lut = False
             self.postProcess.Tonemapping = True
         elif self.postProcessingQuality == 2:
             self.postProcess.Bloom = True
             self.postProcess.Desaturate = True
             self.postProcess.DynamicExposure = True
             self.postProcess.FilmGrain = True
-            self.postProcess.Fog = False
-            self.postProcess.GodRays = True
-            self.postProcess.Lut = False
             self.postProcess.Tonemapping = True
 
         self.ApplyPerformancePreferencesToScene()
