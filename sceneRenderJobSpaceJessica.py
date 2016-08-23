@@ -32,7 +32,6 @@ class SceneRenderJobSpaceJessica(SceneRenderJobSpace):
             "postProcessingQuality": 2,
             "shadowQuality": 2,
             "shadowMapSize": 1024,
-            "hdrEnabled": True,
         }
         self.backBufferOverride = None
         self.depthBufferOverride = None

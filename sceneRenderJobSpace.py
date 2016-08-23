@@ -576,7 +576,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         """
         currentSettings = {}
 
-        currentSettings["hdrEnabled"] = gfxsettings.Get(gfxsettings.GFX_HDR_ENABLED)
         currentSettings["postProcessingQuality"] = gfxsettings.Get(gfxsettings.GFX_POST_PROCESSING_QUALITY)
         currentSettings["shadowQuality"] = gfxsettings.Get(gfxsettings.GFX_SHADOW_QUALITY)
         currentSettings["aaQuality"] = gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING)
@@ -595,7 +594,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.postProcessingQuality = currentSettings["postProcessingQuality"]
         self.shadowQuality = currentSettings["shadowQuality"]
         self.aaQuality = currentSettings["aaQuality"]
-        self.hdrEnabled = currentSettings["hdrEnabled"]
+        self.hdrEnabled = self.postProcessingQuality > 0
         self.gpuParticlesEnabled = currentSettings.get("gpuParticles", True)
 
         isDepth = trinity.GetShaderModel().endswith("DEPTH")
@@ -606,8 +605,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
                                   trinity.GetShaderModel().endswith("DEPTH") and _singletons.platform == 'dx11')
 
         # Apply settings override, usually used by special case rendering(like the photo service)
-        if "hdrEnabled" in self.overrideSettings:
-            self.hdrEnabled = self.overrideSettings["hdrEnabled"]
         if "bbFormat" in self.overrideSettings:
             self.bbFormat = self.overrideSettings["bbFormat"]
         if "aaQuality" in self.overrideSettings:
