@@ -96,9 +96,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.clientToolsScene = None
 
         self.taaPath = "res:/fisfx/postprocess/taa.red"
-        # The active eve space scene key(default, map etc.)
-        self.activeSceneKey = None
-        
+
         # The active camera, this ref might be unneccessary, keep in mind failure to reset
         self.camera = None
         
@@ -257,8 +255,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         """
         This function sets the scene and the scene key associated with it
         """
-
-        self.activeSceneKey = key
         self.SetScene(scene)
 
 
@@ -339,13 +335,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     def ForceDepthPass(self, enabled):
         """ Force a special depth pass under SM_3_0_DEPTH """
         self.forceDepthPass = enabled
-
-
-    def EnablePostProcessing(self, enabled):
-        """
-        Indicate weather post processing is allowed or not
-        """
-        pass
 
 
     def _RefreshPostProcessingJob(self, job, enabled):
