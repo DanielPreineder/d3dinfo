@@ -925,27 +925,21 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if self.postProcessingQuality == 0:
             self.postProcess.Bloom = False
             self.postProcess.Desaturate = False
-            self.postProcess.DynamicExposure = False
             self.postProcess.FilmGrain = False
-            self.postProcess.Tonemapping = False
             self.postProcess.FogEnabled = False
             self.postProcess.Lut = False
             self.postProcess.GodRays = False
         elif self.postProcessingQuality == 1:
             self.postProcess.Bloom = True
             self.postProcess.Desaturate = True
-            self.postProcess.DynamicExposure = False
             self.postProcess.FilmGrain = False
-            self.postProcess.Tonemapping = False
             self.postProcess.FogEnabled = False
             self.postProcess.Lut = True
             self.postProcess.GodRays = False
         elif self.postProcessingQuality == 2:
             self.postProcess.Bloom = True
             self.postProcess.Desaturate = True
-            self.postProcess.DynamicExposure = _singletons.platform == 'dx11'
             self.postProcess.FilmGrain = True
-            self.postProcess.Tonemapping = False
             self.postProcess.FogEnabled = True
             self.postProcess.Lut = True
             self.postProcess.GodRays = True
@@ -975,15 +969,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         else:
             scene.pixelOffsetScale = 0
             scene.taaSubpixelPattern = 0
-
-        if self.enabled:
-            try:
-                if self.postProcess.DynamicExposure:
-                    scene.nebulaBrightnessOverride = 0.3
-                else:
-                    scene.nebulaBrightnessOverride = 0.0
-            except AttributeError:
-                pass
 
     def SetMultiViewStage(self, stageKey):
         self.currentMultiViewStageKey = stageKey
