@@ -18,7 +18,7 @@ import os
 from trinity.sceneRenderJobBase import SceneRenderJobBase
 from trinity.eveSceneRenderJobInterior import EveSceneRenderJobInterior
 from trinity.sceneRenderJobSpace import SceneRenderJobSpace
-import app.Common.Wrapper.TrinityPanelWrapper as TrinityPanelWrapper
+import carbon.tools.jessica.app.Common.Wrapper.TrinityPanelWrapper as TrinityPanelWrapper
 
 AVAILABLE_RENDERJOB_TYPES = [EveSceneRenderJobInterior, 
                             SceneRenderJobSpace, 
