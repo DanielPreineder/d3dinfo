@@ -396,7 +396,7 @@ class RenderTargetParameter(Parameter):
     def UpdateValue(self, parameters):
         if 'copyFrom' in self._data:
             copyFrom = parameters[self._data['copyFrom']].GetValue()
-            if copyFrom:
+            if copyFrom and copyFrom.isValid:
                 if 'width' in self._data:
                     if isinstance(self._data['width'], float):
                         width = int(self._data['width'] * copyFrom.width)
