@@ -561,7 +561,7 @@ class PostProcess(object):
         super(PostProcess, self).__setattr__('_rj', trinity.TriRenderJob())
         super(PostProcess, self).__setattr__('_parameters', {
             '__sourcert__': BuiltinRenderTargetParameter('__sourcert__', self.source),
-            '__destrt__': BuiltinRenderTargetParameter('__sourcert__', self.dest)})
+            '__destrt__': BuiltinRenderTargetParameter('__destrt__', self.dest)})
         super(PostProcess, self).__setattr__('_dependencies', {})
         super(PostProcess, self).__setattr__('_stepDependencies', [])
         super(PostProcess, self).__setattr__('_builtInParameters', self._parameters.keys())
@@ -743,6 +743,9 @@ steps:
         for k in list(self._parameters.keys()):
             if k not in self._builtInParameters:
                 del self._parameters[k]
+
+        for each in self._builtInParameters:
+            self._dependencies[each] = set()
 
         for key, value in data.get('parameters', {}).iteritems():
             self._AddVariable(key, value)
