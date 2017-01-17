@@ -567,7 +567,6 @@ class PostProcess(object):
         super(PostProcess, self).__setattr__('_builtInParameters', self._parameters.keys())
         super(PostProcess, self).__setattr__('__members__', [])
         super(PostProcess, self).__setattr__('_loadPending', False)
-        super(PostProcess, self).__setattr__('_dependenceCache', {})
 
         self.Clear()
 
@@ -578,7 +577,6 @@ class PostProcess(object):
         :jessica-param-widget path: filepath
         :jessica-favorite:
         """
-        self._dependenceCache.clear()
         params = yamlext.load(blue.paths.GetFileContentsWithYield(path))
         for name, value in params.iteritems():
             if name.startswith('_'):
@@ -686,8 +684,8 @@ steps:
         super(PostProcess, self).__setattr__('dest', dest)
         self._SetVariable('__destrt__', dest)
 
-    def _ExpandChangedParams(self, changedParams=()):
-        if not changedParams:
+    def _ExpandChangedParams(self, changedParams=None):
+        if changedParams is None:
             changedParams = self._parameters.keys()
         old = set(changedParams)
         while True:
@@ -698,33 +696,21 @@ steps:
                 return cp
             old = cp
 
-    def _UpdateParameters(self, changedParams=()):
-        key = tuple(changedParams)
-        cached = self._dependenceCache.get(changedParams, None)
-        if cached is not None:
-            changedParams = cached
-            for p in changedParams:
+    def _UpdateParameters(self, changedParams=None):
+        changedParams = self._ExpandChangedParams(changedParams)
+        for p in TopoSort(self._dependencies):
+            if p in changedParams:
                 self._parameters[p].UpdateValue(self._parameters)
-        else:
-            cache = []
-            changedParams = self._ExpandChangedParams(changedParams)
-            for p in TopoSort(self._dependencies):
-                if p in changedParams:
-                    self._parameters[p].UpdateValue(self._parameters)
-                    cache.append(p)
-            self._dependenceCache[key] = cache
+
         used = {k: False for k in self._parameters.iterkeys()}
-        for params, conditionParams, condition, steps in self._stepDependencies:
-            if conditionParams.intersection(changedParams):
-                if condition:
-                    enabled = True if _EvaluateString(condition, self._parameters) else False
-                else:
-                    enabled = True
-                if params.intersection(changedParams):
-                    for step in steps:
-                        step.enabled = enabled
+        for params, condition, steps in self._stepDependencies:
+            if condition:
+                enabled = True if _EvaluateString(condition, self._parameters) else False
             else:
-                enabled = steps[0].enabled
+                enabled = True
+            if params.intersection(changedParams):
+                for step in steps:
+                    step.enabled = enabled
             if enabled:
                 for name in params:
                     self._parameters[name].UpdateUsage(used)
@@ -750,7 +736,6 @@ steps:
             super(PostProcess, self).__setattr__('_loadPending', True)
 
     def _LoadData(self, data):
-        self._dependenceCache.clear()
         del self.__members__[:]
         self._dependencies.clear()
         del self._stepDependencies[:]
@@ -814,10 +799,9 @@ steps:
             self.renderJob.steps.append(step)
             if 'condition' in each:
                 self._stepDependencies.append((usedParameters.union(_GetConditionDependencies(each['condition'])),
-                                               set(_GetConditionDependencies(each['condition'])), each['condition'],
-                                               steps))
+                                               each['condition'], steps))
             else:
-                self._stepDependencies.append((usedParameters, set(), None, steps))
+                self._stepDependencies.append((usedParameters, None, steps))
 
         self._UpdateParameters()
 
