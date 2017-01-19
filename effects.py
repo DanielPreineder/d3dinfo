@@ -82,7 +82,7 @@ def PruneParameters(effect):
     path = blue.paths.ResolvePath(effect.effectFilePath)
     params, resources, _ = effectinfo.get_merged_parameters(path)
     params.update(resources)
-    params = set([name for name, param in params if param.annotation.get('SasUiVisible', False)])
+    params = set([name for name, param in params.items() if param.annotation.get('SasUiVisible', False)])
     delete = []
     for i, param in enumerate(effect.constParameters):
         if param[0] not in params:
