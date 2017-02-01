@@ -322,3 +322,22 @@ def ValidateParameterValue(effect, name, value, cache=None):
     p['self'] = _WrapParameterValue(value, params[name])
     if not eval(validation, {}, p):
         raise AssertionError(params[name].annotation.get('ValidationMessage', 'invalid value'))
+
+
+def GetVertexShaderInputs(effect):
+    """
+    Returns merged vertex shader stage inputs as (usage, usage index) pairs from all permutations of the effect
+    :param effect: effect object
+    :type effect: trinity.Tr2Effect
+    :rtype: set[(int, int)]
+    """
+    inputs = set()
+
+    def inner(shader):
+        for each in shader.passes:
+            if effectinfo.Stages.VERTEX_SHADER in each.stages:
+                vs = each.stages[effectinfo.Stages.VERTEX_SHADER]
+                inputs.update([(x.usage, x.usage_index) for x in vs.inputs if x.used_mask])
+
+    effectinfo.apply_to_shaders(blue.paths.ResolvePath(effect.effectFilePath), inner)
+    return inputs
