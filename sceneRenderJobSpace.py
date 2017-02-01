@@ -61,6 +61,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         "DO_DISTORTIONS",
         "END_RENDERING",
         "DO_TAA",
+        "SET_UI_PROJECTION",
+        "SET_UI_VIEW",
+        "RENDER_3D_UI",
         "RENDER_DEBUG",
         "UPDATE_TOOLS", 
         "RENDER_PROXY", 
@@ -146,6 +149,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         self.prepared = False
 
+        self._enablePostProcessing = True
         self.postProcess = PostProcess()
         self.postProcess.Load('res:/fisfx/postprocess/eve.yaml')
         self.taaJob = evePostProcess.EvePostProcessingJob()
@@ -221,10 +225,12 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     def SetCameraView(self, view):
         super(SceneRenderJobSpace, self).SetCameraView(view)
         self._SetUpdateStep(trinity.TriStepSetView(view), "SET_VIEW")
+        self._SetUpdateStep(trinity.TriStepSetView(view), "SET_UI_VIEW")
 
     def SetCameraProjection(self, proj):
         super(SceneRenderJobSpace, self).SetCameraProjection(proj)
         self._SetUpdateStep(trinity.TriStepSetProjection(proj), "SET_PROJECTION")
+        self._SetUpdateStep(trinity.TriStepSetProjection(proj), "SET_UI_PROJECTION")
 
     def SetCameraCallback(self, cb):
         if self.updateJob is not None:
@@ -242,21 +248,26 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.RemoveStep("SET_PROJECTION")
             self.RemoveStep("SET_UPDATE_VIEW")
             self.RemoveStep("SET_UPDATE_PROJECTION")
+            self.RemoveStep("SET_UI_VIEW")
+            self.RemoveStep("SET_UI_PROJECTION")
             return
 
         if camera is not None:
             self.AddStep("SET_VIEW", trinity.TriStepSetView(None, camera))
             self.AddStep("SET_UPDATE_VIEW", trinity.TriStepSetView(None, camera))
+            self.AddStep("SET_UI_VIEW", trinity.TriStepSetView(None, camera))
             self._SetUpdateStep(trinity.TriStepSetView(None, camera), "SET_VIEW")
             self.AddStep("SET_PROJECTION", trinity.TriStepSetProjection(camera.projectionMatrix))
             self.AddStep("SET_UPDATE_PROJECTION", trinity.TriStepSetProjection(camera.projectionMatrix))
             self._SetUpdateStep(trinity.TriStepSetProjection(camera.projectionMatrix), "SET_PROJECTION")
         if view is not None:
             self.AddStep("SET_VIEW", trinity.TriStepSetView(view))
+            self.AddStep("SET_UI_VIEW", trinity.TriStepSetView(view))
             self.AddStep("SET_UPDATE_VIEW", trinity.TriStepSetView(view))
             self._SetUpdateStep(trinity.TriStepSetView(view), "SET_VIEW")
         if projection is not None:
             self.AddStep("SET_PROJECTION", trinity.TriStepSetProjection(projection))
+            self.AddStep("SET_UI_PROJECTION", trinity.TriStepSetProjection(projection))
             self.AddStep("SET_UPDATE_PROJECTION", trinity.TriStepSetProjection(projection))
             self._SetUpdateStep(trinity.TriStepSetProjection(projection), "SET_PROJECTION")
     
@@ -496,8 +507,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.SetStepAttr("RENDER_MAIN_PASS", 'scene', scene) 
         self.SetStepAttr("BEGIN_RENDER", 'scene', scene)
         self.SetStepAttr("END_RENDERING", 'scene', scene)
-        self.SetStepAttr("RENDER_MAIN_PASS", 'scene', scene)
         self.SetStepAttr("SET_PERFRAME_DATA", 'scene', scene)
+        self.SetStepAttr("RENDER_3D_UI", 'scene', scene)
         if scene is not None:
             self.taaJob.SetPostProcessPSData(scene.GetPostProcessPSBuffer())
         else:
@@ -521,6 +532,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.AddStep("END_RENDERING", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_END_RENDER))
         self.AddStep("RENDER_MAIN_PASS", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_MAIN_RENDER))
         self.AddStep("SET_PERFRAME_DATA", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_SET_PERFRAME_DATA))
+        self.AddStep("RENDER_3D_UI", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_RENDER_UI))
         self._CreateDepthPass()
         self._CreateBackgroundStep()
         
@@ -908,6 +920,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         elif self.shadowQuality == 0:
             self.shadowMap = None
 
+    def EnablePostProcessing(self, enable):
+        self._enablePostProcessing = enable
+        self.SetSettingsBasedOnPerformancePreferences()
+
     def SetSettingsBasedOnPerformancePreferences(self):
         if not self.enabled:
             return
@@ -933,7 +949,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._CreateRenderTargets()
         self._RefreshRenderTargets()
 
-        if self.postProcessingQuality == 0:
+        if self.postProcessingQuality == 0 or not self._enablePostProcessing:
             self.postProcess.Bloom = False
             self.postProcess.Desaturate = False
             self.postProcess.FilmGrain = False
