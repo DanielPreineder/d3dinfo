@@ -190,7 +190,12 @@ class NumericParameter(Parameter):
             self.paramType = trinity.Tr2Vector4Parameter
         else:
             raise RuntimeError()
-        self._dependencies = _GetConditionDependencies(self.value) if isinstance(self.value, basestring) else []
+        if isinstance(self.value, basestring):
+            self._dependencies = _GetConditionDependencies(self.value)
+            self._compiled = compile(self.value, 'string', 'eval')
+        else:
+            self._dependencies = []
+            self._compiled = None
 
     def _GetEffectParameter(self, effect, name):
         try:
@@ -211,8 +216,8 @@ class NumericParameter(Parameter):
         self.value = value
 
     def UpdateValue(self, parameters):
-        if isinstance(self.value, (str, unicode)):
-            self.currentValue = _EvaluateString(self.value, parameters)
+        if self._compiled:
+            self.currentValue = _EvaluateString(self._compiled, parameters)
         else:
             self.currentValue = self.value
         super(NumericParameter, self).UpdateValue(parameters)
@@ -299,6 +304,18 @@ class GpuBufferParameter(Parameter):
         self._pixel_format = self._data['format']
         self._flags = self._data['creationFlags']
         self._dependencies = []
+        if isinstance(self._count, basestring):
+            self._count_compiled = compile(self._count, 'string', 'eval')
+        else:
+            self._count_compiled = None
+        if isinstance(self._pixel_format, basestring):
+            self._pixel_format_compiled = compile(self._pixel_format, 'string', 'eval')
+        else:
+            self._pixel_format_compiled = None
+        if isinstance(self._flags, basestring):
+            self._flags_compiled = compile(self._flags, 'string', 'eval')
+        else:
+            self._flags_compiled = None
 
         if isinstance(self._count, basestring):
             self._dependencies += _GetConditionDependencies(self._count)
@@ -308,16 +325,16 @@ class GpuBufferParameter(Parameter):
             self._dependencies += _GetConditionDependencies(self._flags)
 
     def UpdateValue(self, parameters):
-        if isinstance(self._count, basestring):
-            count = _EvaluateString(self._count, parameters)
+        if self._count_compiled:
+            count = _EvaluateString(self._count_compiled, parameters)
         else:
             count = self._count
-        if isinstance(self._pixel_format, basestring):
-            pixel_format = _EvaluateString(self._pixel_format, parameters)
+        if self._pixel_format_compiled:
+            pixel_format = _EvaluateString(self._pixel_format_compiled, parameters)
         else:
             pixel_format = self._pixel_format
-        if isinstance(self._flags, basestring):
-            flags = _EvaluateString(self._flags, parameters)
+        if self._flags_compiled:
+            flags = _EvaluateString(self._flags_compiled, parameters)
         else:
             flags = self._flags
         if not self.buffer or not self.buffer.isValid or self.buffer.count != count or self.buffer.format != pixel_format or self.buffer.creationFlags != flags:
@@ -479,11 +496,12 @@ class ConditionParameter(Parameter):
         self.true = data[True]
         self.false = data[False]
         self.active = None
+        self._compiled = compile(self.condition, 'string', 'eval')
 
         self._dependencies = [self.true, self.false] + _GetConditionDependencies(data['condition'])
 
     def UpdateValue(self, parameters):
-        if _EvaluateString(self.condition, parameters):
+        if _EvaluateString(self._compiled, parameters):
             active = parameters[self.true]
         else:
             active = parameters[self.false]
@@ -704,6 +722,7 @@ steps:
                 self._parameters[p].UpdateValue(self._parameters)
 
         used = {k: False for k in self._parameters.iterkeys()}
+        toUpdateUsage = set()
         for params, condition, steps in self._stepDependencies:
             if condition:
                 enabled = True if _EvaluateString(condition, self._parameters) else False
@@ -713,8 +732,9 @@ steps:
                 for step in steps:
                     step.enabled = enabled
             if enabled:
-                for name in params:
-                    self._parameters[name].UpdateUsage(used)
+                toUpdateUsage.update(params)
+        for name in toUpdateUsage:
+            self._parameters[name].UpdateUsage(used)
         for name, is_used in used.iteritems():
             if is_used:
                 self._parameters[name].Load(self._parameters)
@@ -802,7 +822,7 @@ steps:
             self.renderJob.steps.append(step)
             if 'condition' in each:
                 self._stepDependencies.append((usedParameters.union(_GetConditionDependencies(each['condition'])),
-                                               each['condition'], steps))
+                                               compile(each['condition'], 'string', 'eval'), steps))
             else:
                 self._stepDependencies.append((usedParameters, None, steps))
 
