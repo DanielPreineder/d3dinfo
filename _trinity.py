@@ -50,7 +50,7 @@ def _RobustImport(moduleName, moduleNameForFallback=None):
                 moduleName, moduleNameForFallback)
             mod = __import__(moduleNameForFallback, fromlist=['*'])
         else:
-            _utils.Quit("Failed to import trinity DLL (%r)" % ex)
+            _utils.Quit("Failed to import %s (%r)" % (moduleName, repr(ex)))
 
     for memberName in dir(mod):
         globals()[memberName] = getattr(mod, memberName)
