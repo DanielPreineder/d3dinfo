@@ -170,6 +170,64 @@ class Parameter(object):
         pass
 
 
+class StepAttribute(object):
+    """
+    Class for generic, externally provided parameters. Trinity objects f.x.
+    """
+    def __init__(self, name, value):
+        self.name = name
+        "attribute name"
+        self._value = value
+        self._bindings = {}
+
+    def UpdateValue(self, parameters):
+        """
+        Updates the internal parameter value and all its bindings
+        :param parameters: all post-process parameter objects
+        """
+        self._UpdateBindings()
+
+    def GetValue(self):
+        return self._value
+
+    def GetExposedValue(self):
+        return self.GetValue()
+
+    def SetValue(self, value):
+        self._value = value
+
+    def SetExposedValue(self, value):
+        self.SetValue(value)
+
+    def _ApplyToObject(self, obj, name):
+        setattr(obj, name, self.GetValue())
+
+    def Bind(self, obj, name):
+        self._bindings[(obj, name)] = (obj, name, self._ApplyToObject)
+
+    def Unbind(self, obj, name):
+        try:
+            del self._bindings[(obj, name)]
+        except KeyError:
+            pass
+
+    def GetDependencies(self):
+        return ()
+
+    def _UpdateBindings(self):
+        for obj, name, applyFunc in self._bindings.itervalues():
+            applyFunc(obj, name)
+
+    def UpdateUsage(self, usage):
+        usage[self.name] = True
+
+    def Load(self, parameters):
+        pass
+
+    def Unload(self):
+        pass
+
+
 class NumericParameter(Parameter):
     """
     Numeric (float or vector) parameter type.
@@ -368,7 +426,7 @@ class GpuBufferParameter(Parameter):
 
 class BuiltinRenderTargetParameter(Parameter):
     """
-    Externally-provided render target parameter (source, destination render targets)
+    Externally-provided render target parameter (source, destination, velocity, accumulation render targets)
     """
     def __init__(self, name, rt):
         super(BuiltinRenderTargetParameter, self).__init__(name, {'type': 'rendertarget'})
@@ -575,11 +633,17 @@ class PostProcess(object):
         self.renderJob.enabled = False
         super(PostProcess, self).__setattr__('source', None)
         super(PostProcess, self).__setattr__('dest', None)
+        super(PostProcess, self).__setattr__('velocity', None)
+        super(PostProcess, self).__setattr__('accumulation', None)
+        super(PostProcess, self).__setattr__('psData', None)
         super(PostProcess, self).__setattr__('_data', None)
         super(PostProcess, self).__setattr__('_rj', trinity.TriRenderJob())
         super(PostProcess, self).__setattr__('_parameters', {
             '__sourcert__': BuiltinRenderTargetParameter('__sourcert__', self.source),
-            '__destrt__': BuiltinRenderTargetParameter('__destrt__', self.dest)})
+            '__destrt__': BuiltinRenderTargetParameter('__destrt__', self.dest),
+            '__velocityrt__': BuiltinRenderTargetParameter('__velocityrt__', self.velocity),
+            '__accumrt__': BuiltinRenderTargetParameter('__accumrt__', self.accumulation),
+            '__framepsdata__': StepAttribute('__framepsdata__', self.psData)})
         super(PostProcess, self).__setattr__('_dependencies', {})
         super(PostProcess, self).__setattr__('_dependenciesSorted', [])
         super(PostProcess, self).__setattr__('_stepDependencies', [])
@@ -681,6 +745,26 @@ steps:
     def _SetVariable(self, name, value):
         self._parameters[name].SetExposedValue(value)
         self._UpdateParameters((name,))
+
+    def SetFramePSData(self, psData):
+        super(PostProcess, self).__setattr__('psData', psData)
+        self._SetVariable('__framepsdata__', psData)
+
+    def SetVelocity(self, velocity):
+        """
+        Assigns velocity render target for post-processing
+        :param velocity: velocity render target
+        """
+        super(PostProcess, self).__setattr__('velocity', velocity)
+        self._SetVariable('__velocityrt__', velocity or trinity.Tr2RenderTarget())
+
+    def SetAccumulation(self, accumulation):
+        """
+        Assigns accumulation render target for post-processing
+        :param accumulation: accumulation render target
+        """
+        super(PostProcess, self).__setattr__('accumulation', accumulation)
+        self._SetVariable('__accumrt__', accumulation or trinity.Tr2RenderTarget())
 
     def SetSource(self, source):
         """
@@ -786,7 +870,7 @@ steps:
             usedParameters = set()
             step = getattr(trinity, 'TriStep%s' % each['type'])()
             for key, value in each.iteritems():
-                if key not in ('type', 'parameters', 'effectParameters', 'condition', 'renderTargets'):
+                if key not in ('type', 'parameters', 'effectParameters', 'condition', 'renderTargets', 'stepAttributes'):
                     if isinstance(value, dict):
                         reader = blue.DictReader()
                         value = reader.CreateObject(value)
@@ -805,6 +889,10 @@ steps:
                     if value in tempVars:
                         value = tempVars[value]
                     self._parameters[value].Bind(step.effect, key)
+                    usedParameters.add(value)
+            for key, value in each.get('stepAttributes', {}).iteritems():
+                if value in self._parameters:
+                    self._parameters[value].Bind(step, key)
                     usedParameters.add(value)
 
             steps = [step]
