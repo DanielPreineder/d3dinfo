@@ -404,9 +404,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     def _CreateDepthPass(self):
         rj = trinity.TriRenderJob()
 
-        if _singletons.platform != 'dx11' and self.enabled and self.doDepthPass and self.depthTexture is not None:
+        if self.enabled and self.doDepthPass and self.depthTexture is not None:
             rj.steps.append(trinity.TriStepPushViewport())
-            rj.steps.append(trinity.TriStepPushRenderTarget(self._GetRTForDepthPass()))
+            if _singletons.platform != 'dx11':
+                rj.steps.append(trinity.TriStepPushRenderTarget(self._GetRTForDepthPass()))
             rj.steps.append(trinity.TriStepPushDepthStencil(self.depthTexture))
             # This amazing viewport foo is currently the cleanest way to guarantee correct viewports
             # in the client, embedded jobs, maya and tp2.
@@ -414,7 +415,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             rj.steps.append(trinity.TriStepPushViewport())
             rj.steps.append(trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_DEPTH_PASS))
             rj.steps.append(trinity.TriStepPopDepthStencil())
-            rj.steps.append(trinity.TriStepPopRenderTarget())
+            if _singletons.platform != 'dx11':
+                rj.steps.append(trinity.TriStepPopRenderTarget())
             rj.steps.append(trinity.TriStepPopViewport())
 
         self.AddStep("RENDER_DEPTH_PASS", trinity.TriStepRunJob(rj))
@@ -896,7 +898,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._SetSettingsBasedOnPerformancePreferences()
         
         self.usePostProcessing = self.postProcessingQuality > 0
-        self.doDepthPass = (not self.useFXAA and self.msaaType > 1) or self.forceDepthPass
+        if _singletons.platform == 'dx11':
+            self.doDepthPass = (trinity.GetShaderModel() == 'SM_3_0_DEPTH') or self.forceDepthPass
+        else:
+            self.doDepthPass = (not self.useFXAA and self.msaaType > 1) or self.forceDepthPass
 
         if self.distortionEffectsEnabled:
             self.distortionJob.AddPostProcess("Distortion", "res:/fisfx/postprocess/distortion.red")
@@ -1015,7 +1020,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.RemoveStep("RESTORE_DEPTH")
 
         if self.depthTexture is not None:
-            if not self.doDepthPass:
+            if not self.doDepthPass or _singletons.platform == 'dx11':
                 self.AddStep("SET_DEPTH", trinity.TriStepPushDepthStencil(depthTexture))
                 self.AddStep("RESTORE_DEPTH", trinity.TriStepPopDepthStencil())
             self._SetDepthMap()
