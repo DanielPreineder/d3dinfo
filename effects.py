@@ -362,3 +362,26 @@ def GetVertexShaderInputs(effect):
 
     effectinfo.apply_to_shaders(blue.paths.ResolvePath(effect.effectFilePath), inner)
     return inputs
+
+
+def PopulateDefaultOptions(effect):
+    """
+    Populate effect options list with default values for the effect resource
+    :param effect: effect object
+    :type effect: trinity.Tr2Effect
+    """
+    path = blue.paths.ResolvePath(effect.effectFilePath)
+    for platform in effectinfo.PLATFORM_NAMES.iterkeys():
+        for sm in effectinfo.SHADER_MODEL_NAMES.iterkeys():
+            try:
+                compiled = effectinfo.paths.get_compiled_path(path, sm, platform)
+            except ValueError:
+                continue
+            try:
+                info = effectinfo.EffectInfo(compiled)
+            except IOError:
+                continue
+            for option in info.permutations:
+                if option.name in [x[0] for x in effect.options]:
+                    continue
+                effect.options.append((option.name, option.options[option.default_index]))
