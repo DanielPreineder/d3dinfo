@@ -32,6 +32,7 @@ class SceneRenderJobCharacters( SceneRenderJobBase ):
         "UPDATE_UI",
         "UPDATE_BACKDROP",
         "UPDATE_CAMERA",
+        "UPDATE_SECONDARY_CAMERAS",
         "SET_BACKBUFFER",
         "SET_DEPTH_STENCIL",
         "CLEAR",
