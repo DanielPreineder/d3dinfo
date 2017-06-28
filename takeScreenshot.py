@@ -201,36 +201,6 @@ def OverrideAllProjectionsAndViewports(rjList, newProj, newVP):
         SetViewport(rj, newVP)
 
 
-def FreezeInteriorFlares():
-    """
-    Disable updates for all interior flares and return their previous update state.
-    """
-    flareList = trinity.device.Find('trinity.Tr2InteriorFlare')
-    flarePreviousState = {}
-    for flare in flareList:
-        if flare not in flarePreviousState:
-            flarePreviousState[flare] = flare.updateVisibility
-            flare.updateVisibility = False
-    return flarePreviousState
-    
-    
-def RestoreInteriorFlares(flarePreviousState):
-    """
-    Restore updates for interior flares.
-    """
-    for flare in flarePreviousState:
-        flare.updateVisibility = flarePreviousState[flare]
-        flare.OverrideViewport(None)
-
-def OverrideInteriorFlareViewports(flarePreviousState, x, y, width, height):
-    viewport = trinity.TriViewport()
-    viewport.x = int(x)
-    viewport.y = int(y)
-    viewport.width = int(width)
-    viewport.height = int(height)
-    for flare in flarePreviousState:
-        flare.OverrideViewport(viewport)
-        
 # ########################################################################################
 #  ______ _   _ _____     _    _          _____ _  __
 # |  ____| \ | |  __ \   | |  | |   /\   / ____| |/ /
@@ -329,9 +299,7 @@ def TakeScreenshot(filename, tilesAcross, saverClass = HostBitmapSaver):
     
     # Backup projections and viewports
     BackupAllProjectionsAndViewports(sceneRenderJobs)
-    
-    flarePreviousState = FreezeInteriorFlares()
-            
+
     try:
         
         if filename == None or filename == '':
@@ -391,8 +359,7 @@ def TakeScreenshot(filename, tilesAcross, saverClass = HostBitmapSaver):
                         
                         # Override projections and viewports
                         OverrideAllProjectionsAndViewports(sceneRenderJobs, newProj, newViewport)
-                        OverrideInteriorFlareViewports(flarePreviousState, int(x_off[1] + tileOffset[0]), int(y_off[1] + tileOffset[1]), tileWidth * tilesAcross, tileHeight * tilesAcross)
-                        
+
                         dev.Render()
                         # renderjobs run after the scene render in jessica, which means that lightmap updates etc. are
                         # one frame behind. So uh render again.
@@ -422,9 +389,6 @@ def TakeScreenshot(filename, tilesAcross, saverClass = HostBitmapSaver):
         traceback.print_exc()
         errorHint = "An exception occurred: " + e.message
 
-        
-    RestoreInteriorFlares(flarePreviousState)
-        
     # Re-enable disabled jobs
     for rj, state in disabledJobsStates.iteritems():
         rj.enabled = state

@@ -251,63 +251,6 @@ def CreatePythonBinding(cs, src, srcAttr, dst, dstAttr):
     return binding
 
 
-_isShaderLibraryInitialized = False
-_isShaderLibraryPopulated = False
-
-
-def PopulateShaderLibraryFromFiles():
-    global _isShaderLibraryInitialized, _isShaderLibraryPopulated
-    if _isShaderLibraryInitialized:
-        return
-    _isShaderLibraryInitialized = True
-
-    def _AddToShaderLibrary(filepath):
-        highLevelShader = blue.resMan.LoadObject(filepath)
-        if highLevelShader is not None:
-            try:
-                shaderManager.shaderLibrary.append(highLevelShader)
-            except Exception:
-                logger.exception(
-                    "Exception loading High Level Shader: %s", filepath)
-                sys.exc_clear()
-        else:
-            logger.error("Unable to find shader library object: %s",
-                         filepath)
-
-    # When running locally and you happen to have black files around we may
-    # end up with double entries if we're not careful.
-    filesToLoad = set()
-    for path, dirs, files in walk.walk("res:/Graphics/Shaders/ShaderDescriptions"):
-        for f in files:
-            filename, extension = os.path.splitext(f)
-            if extension in [".red", ".black"]:
-                filepath = path + '/' + filename + ".red"
-                filesToLoad.add(filepath)
-    uthread2.map(_AddToShaderLibrary, filesToLoad)
-    _isShaderLibraryPopulated = True
-
-SHADERLIBRARYFOLDER = "res:/Graphics/Shaders"
-SHADERLIBRARYFILENAME = SHADERLIBRARYFOLDER + "/ShaderDescriptions.red"
-
-@telemetry.ZONE_FUNCTION
-def PopulateShaderLibrary():
-    if blue.paths.exists(SHADERLIBRARYFILENAME):
-        global _isShaderLibraryInitialized, _isShaderLibraryPopulated
-        if _isShaderLibraryInitialized:
-            return
-        _isShaderLibraryInitialized = True
-
-        shaders = blue.resMan.LoadObject(SHADERLIBRARYFILENAME)
-        shaderManager.shaderLibrary = shaders.shaderLibrary
-        _isShaderLibraryPopulated = True
-    else:
-        PopulateShaderLibraryFromFiles()
-
-
-def IsShaderLibraryPopulated():
-    return _isShaderLibraryPopulated
-
-
 def IsMsaaTypeSupported(msaa_type, formats):
     supported = True
     for surface_format in formats:

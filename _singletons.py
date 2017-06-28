@@ -14,7 +14,6 @@ platform = _trinity._ImportDll()
 adapters = _trinity._blue.classes.CreateInstance("trinity.Tr2VideoAdapters")
 device = _trinity._blue.classes.CreateInstance("trinity.TriDevice")
 app = _trinity._blue.classes.CreateInstance("triui.App")
-shaderManager = _trinity.GetShaderManager()
 
 # Our singleton which goes on the device.
 from . import renderjobs
