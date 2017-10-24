@@ -236,12 +236,12 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     def SetCameraView(self, view):
         super(SceneRenderJobSpace, self).SetCameraView(view)
         self._SetUpdateStep(trinity.TriStepSetView(view), "SET_VIEW")
-        self._SetUpdateStep(trinity.TriStepSetView(view), "SET_UI_VIEW")
+        self.AddStep(trinity.TriStepSetView(view), "SET_UI_VIEW")
 
     def SetCameraProjection(self, proj):
         super(SceneRenderJobSpace, self).SetCameraProjection(proj)
         self._SetUpdateStep(trinity.TriStepSetProjection(proj), "SET_PROJECTION")
-        self._SetUpdateStep(trinity.TriStepSetProjection(proj), "SET_UI_PROJECTION")
+        self.AddStep(trinity.TriStepSetProjection(proj), "SET_UI_PROJECTION")
 
     def SetCameraCallback(self, cb):
         if self.updateJob is not None and self.updateJob.scheduled:
@@ -481,11 +481,13 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if self.updateJob is None:
             return
         step.name = name
-        idx = 0
+        idx = None
         for i, each in enumerate(self.updateJob.steps):
             if each.name == name:
                 idx = i
                 break
+        if idx is None:
+            raise KeyError('Update step is not found')
         self.updateJob.steps[idx] = step
 
     def _SetScene(self, scene):
