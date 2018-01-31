@@ -492,15 +492,22 @@ class RenderTargetParameter(Parameter):
                         height = self._data['height']
                 else:
                     height = copyFrom.height
-                self.rt = trinity.Tr2RenderTarget(width, height, self._data.get('mipCount', copyFrom.mipCount),
-                                                  self._data.get('format', copyFrom.format),
-                                                  self._data.get('multiSampleType', copyFrom.multiSampleType),
-                                                  self._data.get('multiSampleQuality', copyFrom.multiSampleQuality),
-                                                  trinity.EX_FLAG.BIND_UNORDERED_ACCESS if self._data.get('uav', False) else 0)
-                self.rt.name = self.name
+
+                mipCount = self._data.get('mipCount', copyFrom.mipCount)
+                pixelFormat = self._data.get('format', copyFrom.format)
+                samples = self._data.get('multiSampleType', copyFrom.multiSampleType)
+                quality = self._data.get('multiSampleQuality', copyFrom.multiSampleQuality)
+
+                if (not self.rt or self.rt.width != width or self.rt.height != height or self.rt.mipCount != mipCount or
+                            self.rt.format != pixelFormat or self.rt.multiSampleType != samples or
+                            self.rt.multiSampleQuality != quality):
+                    self.rt = trinity.Tr2RenderTarget(width, height, mipCount, pixelFormat, samples, quality,
+                                                      trinity.EX_FLAG.BIND_UNORDERED_ACCESS if self._data.get('uav',
+                                                                                                              False) else 0)
+                    self.rt.name = self.name
             else:
                 self.rt = None
-        else:
+        elif not self.rt:
             self.rt = trinity.Tr2RenderTarget(self._data['width'], self._data['height'], self._data.get('mipCount', 1),
                                               self._data['format'], self._data.get('multiSampleType', 1),
                                               self._data.get('multiSampleQuality', 1),
@@ -815,6 +822,8 @@ steps:
         Assigns source render target for post-processing
         :param source: Source render target
         """
+        if self.source == source:
+            return
         super(PostProcess, self).__setattr__('source', source)
         self._SetVariable('__sourcert__', source or trinity.Tr2RenderTarget())
         self.renderJob.enabled = True if source else False
