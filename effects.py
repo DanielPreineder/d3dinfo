@@ -9,8 +9,14 @@ def _GetMergedParameters(resPath, options, cache):
 
     def ShaderFilter(platform, sm, permutation):
         for option, value in permutation:
-            if option.type == effectinfo.Permutation.STATIC and options.get(option.name, None) != value:
-                return False
+            if option.type != effectinfo.Permutation.STATIC:
+                continue
+            if option.name in options:
+                if options[option.name] != value:
+                    return False
+            else:
+                if option.options[option.default_index] != value:
+                    return False
         return True
 
     resPath = resPath.lower().replace('\\', '/')
@@ -353,8 +359,14 @@ def GetVertexShaderInputs(effect):
         :return:
         """
         for option, value in shader.options:
-            if option.type == effectinfo.Permutation.STATIC and options.get(option.name, None) != value:
-                return
+            if option.type != effectinfo.Permutation.STATIC:
+                continue
+            if option.name in options:
+                if options[option.name] != value:
+                    return
+            else:
+                if option.options[option.default_index] != value:
+                    return
         for technique in shader.techniques:
             for each in technique.passes:
                 if effectinfo.Stages.VERTEX_SHADER in each.stages:
