@@ -722,6 +722,8 @@ class PostProcess(object):
             value = param.GetValue()
             if isinstance(value, (int, long, float, tuple, bool)):
                 params[name] = value
+            elif isinstance(value, trinity.TriTextureRes):
+                params[name] = str(value.path)
         return params
 
     def SaveParameters(self, path):
