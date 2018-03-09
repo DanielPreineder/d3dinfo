@@ -32,6 +32,10 @@ def _GetMergedParameters(resPath, options, cache):
     return dict(result[0]), dict(result[1]), dict(result[2])
 
 
+def GetMergedParameters(resPath, options=(), cache=None):
+    return _GetMergedParameters(resPath, options, cache)
+
+
 def GetPublicParameters(effect, cache=None):
     """
     Returns all public parameters (those that have 'SasUiVisible' annotation) for compiled effect
@@ -280,6 +284,8 @@ class _VectorWrapper(object):
                 result.append(self._value[3])
             else:
                 raise AttributeError(item)
+        if len(result) == 1:
+            return result[0]
         return tuple(result)
 
 
@@ -340,7 +346,8 @@ def ValidateParameterValue(effect, name, value, cache=None):
             p[each.name] = _WrapParameterValue(each.value, params[each.name])
     p['self'] = _WrapParameterValue(value, params[name])
     if not eval(validation, {}, p):
-        raise AssertionError(params[name].annotation.get('ValidationMessage', 'invalid value'))
+        message = params[name].annotation.get('ValidationMessage', 'invalid value')
+        raise AssertionError(params[name].annotation.get('ValidationMessage', message))
 
 
 def GetVertexShaderInputs(effect):
