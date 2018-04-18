@@ -637,7 +637,13 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         # customBackBuffer
         useCustomBackBuffer = self.hdrEnabled or self.msaaEnabled
-        customFormat = trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT if self.hdrEnabled else self.bbFormat
+        if self.hdrEnabled:
+            if _singletons.platform == 'dx11':
+                customFormat = trinity.PIXEL_FORMAT.R11G11B10_FLOAT
+            else:
+                customFormat = trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT
+        else:
+            customFormat = self.bbFormat
         # 1 is the default Tr2RenderTarget multiSampleType for non-multisampled render targets.
         msaaType = self.msaaType if self.msaaEnabled else 1
 
@@ -680,7 +686,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         # blitTexture
         useBlitTexture = (self.usePostProcessing or self.distortionEffectsEnabled or self.taaEnabled)
         useBlitTexture = useBlitTexture or (self.hdrEnabled and self.msaaEnabled)
-        blitFormat = trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT if self.hdrEnabled else self.bbFormat
+        blitFormat = customFormat
         if useBlitTexture and self._TargetDiffers(self.blitTexture, "trinity.Tr2RenderTarget", blitFormat, 0, width, height):
             self.blitTexture = rtm.GetRenderTargetAL(width, height, 1, blitFormat, index=1)
             if self.blitTexture is not None:
