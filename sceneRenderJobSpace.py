@@ -633,7 +633,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             return
 
         width, height = self.GetBackBufferSize()
-        dsFormatAL = _singletons.device.depthStencilFormat
 
         # customBackBuffer
         useCustomBackBuffer = self.hdrEnabled or self.msaaEnabled
@@ -646,6 +645,12 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             customFormat = self.bbFormat
         # 1 is the default Tr2RenderTarget multiSampleType for non-multisampled render targets.
         msaaType = self.msaaType if self.msaaEnabled else 1
+        if _singletons.platform == 'dx11':
+            dsFormatAL = trinity.DEPTH_STENCIL_FORMAT.D32F
+        elif self.useDepth and msaaType <= 1:
+            dsFormatAL = trinity.DEPTH_STENCIL_FORMAT.READABLE
+        else:
+            dsFormatAL = trinity.DEPTH_STENCIL_FORMAT.D24S8
 
         if useCustomBackBuffer and self._TargetDiffers(self.customBackBuffer, "trinity.Tr2RenderTarget", customFormat, msaaType, width, height):
             if self.msaaEnabled:
@@ -658,28 +663,17 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.customBackBuffer = None
         
         # customDepthStencil
-        if self.msaaEnabled and self._TargetDiffers(self.customDepthStencil, "trinity.Tr2DepthStencil", dsFormatAL, msaaType, width, height):
-                self.customDepthStencil = rtm.GetDepthStencilAL(width, height, dsFormatAL, msaaType)
-        elif not self.msaaEnabled:
-            self.customDepthStencil = None
+        self.customDepthStencil = rtm.GetDepthStencilAL(width, height, dsFormatAL, msaaType)
 
         # depthTexture
         if self.useDepth:
             if _singletons.platform == 'dx11':
-                if self.customDepthStencil is not None:
-                    self.depthTexture = self.customDepthStencil
-                elif self._TargetDiffers(self.depthTexture, "trinity.Tr2DepthStencil", trinity.DEPTH_STENCIL_FORMAT.D32F, 0, width, height):
-                    self.depthTexture = rtm.GetDepthStencilAL(width, height, trinity.DEPTH_STENCIL_FORMAT.D32F)
-                    if self.depthTexture is not None and self.depthTexture.isReadable:
-                        self.depthTexture.name = 'sceneRenderJobSpace.depthTexture'
-                    else:
-                        self.depthTexture = None
-            elif self._TargetDiffers(self.depthTexture, "trinity.Tr2DepthStencil", trinity.DEPTH_STENCIL_FORMAT.READABLE, 0, width, height):
+                self.depthTexture = self.customDepthStencil
+            elif msaaType > 1:
                 self.depthTexture = rtm.GetDepthStencilAL(width, height, trinity.DEPTH_STENCIL_FORMAT.READABLE)
-                if self.depthTexture is not None and self.depthTexture.isReadable:
-                    self.depthTexture.name = 'sceneRenderJobSpace.depthTexture'
-                else:
-                    self.depthTexture = None
+                self.depthTexture.name = 'sceneRenderJobSpace.depthTexture'
+            else:
+                self.depthTexture = self.customDepthStencil
         else:
             self.depthTexture = None
 
@@ -1010,9 +1004,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
                 self.AddStep("SET_VAR_DEPTH", trinity.TriStepSetVariableStore("DepthMap", depthTexture))
                 self.AddStep("SET_VAR_DEPTH_MSAA", trinity.TriStepSetVariableStore("DepthMapMsaa", trinity.TriTextureRes()))
         else:
-            if not self.msaaEnabled:
-                self.RemoveStep("SET_DEPTH")
-                self.RemoveStep("RESTORE_DEPTH")
             self.RemoveStep("SET_VAR_DEPTH")
             self.RemoveStep("SET_VAR_DEPTH_MSAA")
 
