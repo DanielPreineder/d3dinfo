@@ -862,7 +862,10 @@ steps:
         changedParams = self._ExpandChangedParams(changedParams)
         for p in self._dependenciesSorted:
             if p in changedParams:
-                self._parameters[p].UpdateValue(self._parameters)
+                try:
+                    self._parameters[p].UpdateValue(self._parameters)
+                except:
+                    pass
 
         used = {k: False for k in self._parameters.iterkeys()}
         toUpdateUsage = set()
