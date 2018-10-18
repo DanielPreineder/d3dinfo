@@ -437,28 +437,24 @@ class BuiltinRenderTargetParameter(Parameter):
     def __init__(self, name, rt):
         super(BuiltinRenderTargetParameter, self).__init__(name, {'type': 'rendertarget'})
         self.rt = rt
-        self.texture = trinity.TriTextureRes()
-        self.texture.name = self.name
-        self.texture.SetFromRenderTarget(self.rt)
 
     def GetValue(self):
         return self.rt
 
     def SetValue(self, value):
         self.rt = value
-        self.texture.SetFromRenderTarget(self.rt)
 
     def _GetEffectParameter(self, effect, name):
         try:
             param = _FindNamedItem(effect.resources, name)
         except KeyError:
-            param = trinity.TriTextureParameter()
+            param = trinity.Tr2RuntimeTextureParameter()
             param.name = name
             effect.resources.append(param)
-        return param, 'resourcePath'
+        return param, 'texture'
 
     def _ApplyToEffect(self, obj, name):
-        obj.SetResource(self.texture)
+        obj.texture = self.rt
 
 
 class RenderTargetParameter(Parameter):
@@ -471,8 +467,6 @@ class RenderTargetParameter(Parameter):
             raise RuntimeError()
         self._data = data
         self.rt = None
-        self.texture = trinity.TriTextureRes()
-        self.texture.name = self.name
 
     def UpdateValue(self, parameters):
         if 'copyFrom' in self._data:
@@ -513,7 +507,6 @@ class RenderTargetParameter(Parameter):
                                               self._data.get('multiSampleQuality', 1),
                                               trinity.EX_FLAG.BIND_UNORDERED_ACCESS if self._data.get('uav', False) else 0)
             self.rt.name = self.name
-        self.texture.SetFromRenderTarget(self.rt)
         self._UpdateBindings()
 
     def GetValue(self):
@@ -523,16 +516,16 @@ class RenderTargetParameter(Parameter):
         try:
             param = _FindNamedItem(effect.resources, name)
         except KeyError:
-            param = trinity.TriTextureParameter()
+            param = trinity.Tr2RuntimeTextureParameter()
             param.name = name
             effect.resources.append(param)
-        return param, 'resourcePath'
+        return param, 'texture'
 
     def _ApplyToObject(self, obj, name):
         setattr(obj, name, self.GetValue())
 
     def _ApplyToEffect(self, obj, name):
-        obj.SetResource(self.texture)
+        obj.texture = self.rt
 
     def GetDependencies(self):
         if 'copyFrom' in self._data:
