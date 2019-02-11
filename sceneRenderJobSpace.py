@@ -158,6 +158,15 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         self.useImpostors = True
 
+        self._USE_CPP_POSTPROCESS = False
+
+    def ToggleNewPostProcess(self):
+        self._USE_CPP_POSTPROCESS = not self._USE_CPP_POSTPROCESS
+        if self._USE_CPP_POSTPROCESS:
+            print "now using new post process"
+        else:
+            print "now using old post process"
+        self._RefreshRenderTargets()
 
     def Enable(self, schedule=True):
         SceneRenderJobBase.Enable(self, schedule)
@@ -981,10 +990,14 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.RemoveStep("SET_CUSTOM_RT")
             self.RemoveStep("SET_FINAL_RT")
 
-        if customBackBuffer is not None or self.taaEnabled:
-            self.AddStep("FINAL_BLIT", trinity.TriStepRunJob(self.postProcess.renderJob))
+        # replace with a TriStepRenderPostProcess
+        if not self._USE_CPP_POSTPROCESS:
+            if customBackBuffer is not None or self.taaEnabled:
+                self.AddStep("FINAL_BLIT", trinity.TriStepRunJob(self.postProcess.renderJob))
+            else:
+                self.AddStep("FINAL_BLIT", trinity.TriStepRunJob(self.postProcess.indispensableRenderJob))
         else:
-            self.AddStep("FINAL_BLIT", trinity.TriStepRunJob(self.postProcess.indispensableRenderJob))
+            self.AddStep("FINAL_BLIT", trinity.TriStepRenderPostProcess(self.GetScene(), self._GetSourceRTForPostProcessing(), self._GetPostProcessPSData()))
 
         if customDepthStencil is not None:
             self.AddStep("SET_DEPTH", trinity.TriStepPushDepthStencil(customDepthStencil))
