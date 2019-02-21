@@ -887,14 +887,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.ModifyPostProcessForPerformance()
         if not self._USE_CPP_POSTPROCESS:
             self.postProcess.TAA = self.taaEnabled
-        else:
-            scene = self.GetScene()
-            if scene.postprocess:
-                if self.taaEnabled and scene.postprocess.taa is None:
-                    scene.postprocess.taa = trinity.Tr2PPTaaEffect()
-                else:
-                    scene.postprocess.taa = None
-
 
         self.ApplyPerformancePreferencesToScene()
 
@@ -1015,7 +1007,14 @@ class SceneRenderJobSpace(SceneRenderJobBase):
                 self.AddStep("FINAL_BLIT", trinity.TriStepRunJob(self.postProcess.renderJob))
             else:
                 self.AddStep("FINAL_BLIT", trinity.TriStepRunJob(self.postProcess.indispensableRenderJob))
-        else:
+        elif customBackBuffer is not None or self.taaEnabled:
+            scene = self.GetScene()
+            if scene.postprocess:
+                if self.taaEnabled and scene.postprocess.taa is None:
+                    scene.postprocess.taa = trinity.Tr2PPTaaEffect()
+                else:
+                    scene.postprocess.taa = None
+
             self.AddStep("FINAL_BLIT", trinity.TriStepRenderPostProcess(self.GetScene(), self._GetSourceRTForPostProcessing()))
 
         if customDepthStencil is not None:
