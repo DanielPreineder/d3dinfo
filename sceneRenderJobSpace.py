@@ -946,6 +946,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._SetSecondaryLighting()
         trinity.settings.SetValue('eveSpaceSceneDynamicLighting',
                                   trinity.GetShaderModel().endswith("DEPTH") and _singletons.platform == 'dx11')
+        isHighQuality = gfxsettings.Get(gfxsettings.GFX_SHADER_QUALITY) == gfxsettings.SHADER_MODEL_HIGH
+
         scene = self.GetScene()
         if scene is None:
             self.postProcess.SetFramePSData(None)
@@ -973,6 +975,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             scene.nebulaBrightnessOverride = 0.3
         else:
             scene.nebulaBrightnessOverride = 0.0
+
+        scene.reflectionProbe = trinity.Tr2ReflectionProbe() if isHighQuality else None
+
         self.postProcess.SetFramePSData(scene.GetPostProcessPSBuffer())
 
     def _GetPostProcessPSData(self):
