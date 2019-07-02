@@ -429,7 +429,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         if self.enabled and self.doDepthPass and self.depthTexture is not None:
             rj.steps.append(trinity.TriStepPushViewport())
-            if _singletons.platform != 'dx11':
+            if not _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.MSAA_SAMPLE):
                 rj.steps.append(trinity.TriStepPushRenderTarget(self._GetRTForDepthPass()))
             rj.steps.append(trinity.TriStepPushDepthStencil(self.depthTexture))
             # This amazing viewport foo is currently the cleanest way to guarantee correct viewports
@@ -438,7 +438,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             rj.steps.append(trinity.TriStepPushViewport())
             rj.steps.append(trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_DEPTH_PASS))
             rj.steps.append(trinity.TriStepPopDepthStencil())
-            if _singletons.platform != 'dx11':
+            if not _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.MSAA_SAMPLE):
                 rj.steps.append(trinity.TriStepPopRenderTarget())
             rj.steps.append(trinity.TriStepPopViewport())
 
@@ -619,10 +619,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         isDepth = trinity.GetShaderModel().endswith("DEPTH")
         self.secondaryLighting = self.distortionEffectsEnabled = isDepth
-        self.useDepth = isDepth or _singletons.platform == 'dx11'
+        self.useDepth = isDepth or _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.MSAA_SAMPLE)
 
         trinity.settings.SetValue('eveSpaceSceneDynamicLighting',
-                                  trinity.GetShaderModel().endswith("DEPTH") and _singletons.platform == 'dx11')
+                                  trinity.GetShaderModel().endswith("DEPTH") and _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.COMPUTE))
 
         # Apply settings override, usually used by special case rendering(like the photo service)
         if "bbFormat" in self.overrideSettings:
@@ -651,7 +651,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         # customBackBuffer
         useCustomBackBuffer = self.hdrEnabled or self.msaaEnabled
         if self.hdrEnabled:
-            if _singletons.platform == 'dx11':
+            if _singletons.device.SupportsRenderTargetFormat(trinity.PIXEL_FORMAT.R11G11B10_FLOAT):
                 customFormat = trinity.PIXEL_FORMAT.R11G11B10_FLOAT
             else:
                 customFormat = trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT
@@ -659,7 +659,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             customFormat = self.bbFormat
         # 1 is the default Tr2RenderTarget multiSampleType for non-multisampled render targets.
         msaaType = self.msaaType if self.msaaEnabled else 1
-        if _singletons.platform == 'dx11':
+        if _singletons.device.SupportsDepthStencilFormat(trinity.DEPTH_STENCIL_FORMAT.D32F) and _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.MSAA_SAMPLE):
             dsFormatAL = trinity.DEPTH_STENCIL_FORMAT.D32F
         elif self.useDepth and msaaType <= 1:
             dsFormatAL = trinity.DEPTH_STENCIL_FORMAT.READABLE
@@ -681,7 +681,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         # depthTexture
         if self.useDepth:
-            if _singletons.platform == 'dx11':
+            if _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.MSAA_SAMPLE):
                 self.depthTexture = self.customDepthStencil
             elif msaaType > 1:
                 self.depthTexture = rtm.GetDepthStencilAL(width, height, trinity.DEPTH_STENCIL_FORMAT.READABLE)
@@ -783,7 +783,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.msaaQuality = self._GetMSAAQualityFromAAQuality(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
 
         taaEnabled = gfxsettings.IsTAAEnabled(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
-        self.taaEnabled = taaEnabled and _singletons.platform == 'dx11' and trinity.GetShaderModel().endswith("DEPTH") and self.useTAA
+        self.taaEnabled = taaEnabled and _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.TAA) and trinity.GetShaderModel().endswith("DEPTH") and self.useTAA
 
         # Graphics Settings: Again, avoiding this call would be preferrable, 
         # perhaps a util function in evegraphics
@@ -876,7 +876,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._SetSettingsBasedOnPerformancePreferences()
         
         self.usePostProcessing = self.postProcessingQuality > 0
-        if _singletons.platform == 'dx11':
+        if _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.MSAA_SAMPLE):
             self.doDepthPass = (trinity.GetShaderModel() != 'SM_3_0_LO') or self.forceDepthPass
         else:
             self.doDepthPass = (self.msaaType > 1) or self.forceDepthPass
@@ -933,8 +933,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.postProcess.FogEnabled = True
             self.postProcess.Lut = True
             self.postProcess.GodRays = True
-            self.postProcess.DynamicExposure = _singletons.platform == 'dx11'
-            self.postProcess.Tonemapping = _singletons.platform == 'dx11'
+            self.postProcess.DynamicExposure = _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.COMPUTE)
+            self.postProcess.Tonemapping = _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.COMPUTE)
             self.postProcess.Vignette = True
             self.postProcess.FinalBlit = True
 
@@ -945,7 +945,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._SetVelocityMap()
         self._SetSecondaryLighting()
         trinity.settings.SetValue('eveSpaceSceneDynamicLighting',
-                                  trinity.GetShaderModel().endswith("DEPTH") and _singletons.platform == 'dx11')
+                                  trinity.GetShaderModel().endswith("DEPTH") and _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.COMPUTE))
 
         try:
             isHighQuality = gfxsettings.Get(gfxsettings.GFX_SHADER_QUALITY) == gfxsettings.SHADER_MODEL_HIGH
@@ -975,7 +975,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             else:
                 scene.pixelOffsetScale = 0
                 scene.taaSubpixelPattern = 0
-        if _singletons.platform == 'dx11' and self.postProcessingQuality == 2:
+        if _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.COMPUTE) and self.postProcessingQuality == 2:
             scene.nebulaBrightnessOverride = 0.3
         else:
             scene.nebulaBrightnessOverride = 0.0
@@ -1038,7 +1038,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.RemoveStep("RESTORE_DEPTH")
 
         if self.depthTexture is not None:
-            if not self.doDepthPass or _singletons.platform == 'dx11':
+            if not self.doDepthPass or _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.MSAA_SAMPLE):
                 self.AddStep("SET_DEPTH", trinity.TriStepPushDepthStencil(depthTexture))
                 self.AddStep("RESTORE_DEPTH", trinity.TriStepPopDepthStencil())
             self._SetDepthMap()

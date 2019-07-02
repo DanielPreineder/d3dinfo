@@ -13,8 +13,14 @@ import blue
 from . import _trinity
 platform = _trinity._ImportDll()
 adapters = _trinity._blue.classes.CreateInstance("trinity.Tr2VideoAdapters")
+""":type: trinity.Tr2VideoAdapters"""
 device = _trinity._blue.classes.CreateInstance("trinity.TriDevice")
+""":type: trinity.TriDevice"""
 app = _trinity._blue.classes.CreateInstance("triui.App")
+""":type: trinity.App"""
+platformInfo = _trinity._blue.classes.CreateInstance("trinity.Tr2PlatformInfo")
+""":type: trinity.Tr2PlatformInfo"""
+
 
 # Our singleton which goes on the device.
 from . import renderjobs
