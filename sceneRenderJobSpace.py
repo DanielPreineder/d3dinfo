@@ -58,6 +58,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         "CLEAR",
         "BEGIN_RENDER",
         "RENDER_BACKGROUND",
+        "DO_BACKGROUND_DISTORTIONS",
         "RENDER_DEPTH_PASS",
         "RENDER_MAIN_PASS",
         "DO_DISTORTIONS",
@@ -445,22 +446,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.AddStep("RENDER_DEPTH_PASS", trinity.TriStepRunJob(rj))
 
 
-    def _CreateBackgroundStep(self, scene=None):
-        if scene is None:
-            scene = self.GetScene()
-
-        job = CreateRenderJob()
-        job.steps.append(trinity.TriStepRenderPass(scene, trinity.TRIPASS_BACKGROUND_RENDER))
-        job.steps.append(trinity.TriStepRunJob(self.backgroundDistortionJob))
-
-        self.AddStep("RENDER_BACKGROUND", trinity.TriStepRunJob(job))
-
-
-    def _SetBackgroundScene(self, scene):
-        backgroundJob = self.GetStep("RENDER_BACKGROUND")
-        if backgroundJob is not None:
-            backgroundJob.job.steps[0].scene = scene
-
     def _FindUpdateStep(self, key):
         for each in self.updateJob.steps:
             if each.name == key:
@@ -512,8 +497,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.SetStepAttr("END_RENDERING", 'scene', scene)
         self.SetStepAttr("SET_PERFRAME_DATA", 'scene', scene)
         self.SetStepAttr("RENDER_3D_UI", 'scene', scene)
+        self.SetStepAttr("RENDER_BACKGROUND", 'scene', scene)
+        self.SetStepAttr("DO_BACKGROUND_DISTORTIONS", 'predicate', scene)
+        self.SetStepAttr("DO_DISTORTIONS", 'predicate', scene)
         self._CreateDepthPass()
-        self._SetBackgroundScene(scene)
 
         self.ApplyPerformancePreferencesToScene()
 
@@ -526,17 +513,22 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if self.updateJob is not None:
             if len(self.updateJob.steps) == 0:
                 self._CreateUpdateSteps()
-        self.AddStep("UPDATE_SCENE", trinity.TriStepUpdate(self.GetScene()))
+        scene = self.GetScene()
+        self.AddStep("UPDATE_SCENE", trinity.TriStepUpdate(scene))
         self.AddStep("UPDATE_BRACKETS", trinity.TriStepUpdate())
         self.AddStep("SET_VIEWPORT", trinity.TriStepSetViewport())
-        self.AddStep("BEGIN_RENDER", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_BEGIN_RENDER))
-        self.AddStep("END_RENDERING", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_END_RENDER))
-        self.AddStep("RENDER_MAIN_PASS", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_MAIN_RENDER))
-        self.AddStep("SET_PERFRAME_DATA", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_SET_PERFRAME_DATA))
-        self.AddStep("RENDER_3D_UI", trinity.TriStepRenderPass(self.GetScene(), trinity.TRIPASS_RENDER_UI))
+        self.AddStep("BEGIN_RENDER", trinity.TriStepRenderPass(scene, trinity.TRIPASS_BEGIN_RENDER))
+        self.AddStep("END_RENDERING", trinity.TriStepRenderPass(scene, trinity.TRIPASS_END_RENDER))
+        self.AddStep("RENDER_MAIN_PASS", trinity.TriStepRenderPass(scene, trinity.TRIPASS_MAIN_RENDER))
+        self.AddStep("SET_PERFRAME_DATA", trinity.TriStepRenderPass(scene, trinity.TRIPASS_SET_PERFRAME_DATA))
+        self.AddStep("RENDER_3D_UI", trinity.TriStepRenderPass(scene, trinity.TRIPASS_RENDER_UI))
         self._CreateDepthPass()
-        self._CreateBackgroundStep()
-        
+        self.AddStep("RENDER_BACKGROUND", trinity.TriStepRenderPass(scene, trinity.TRIPASS_BACKGROUND_RENDER))
+        self.AddStep("DO_BACKGROUND_DISTORTIONS",
+                     trinity.TriStepPredicated("hasBackgroundDistortionBatches",
+                                               scene,
+                                               trinity.TriStepRunJob(self.backgroundDistortionJob)))
+
 
         # We need the standard clear
         self.AddStep("CLEAR", trinity.TriStepClear((0.0,0.0,0.0,0.0), 0.0))
@@ -1061,7 +1053,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._RefreshPostProcessingJob(self.backgroundDistortionJob, self.distortionEffectsEnabled and self.prepared)
 
         if distortionTexture is not None:
-            self.AddStep("DO_DISTORTIONS", trinity.TriStepRunJob(self.distortionJob))
+            self.AddStep("DO_DISTORTIONS",
+                         trinity.TriStepPredicated("hasForegroundDistortionBatches",
+                                                   self.GetScene(),
+                                                   trinity.TriStepRunJob(self.distortionJob)))
             distortionTriTextureRes = trinity.TriTextureRes()
             distortionTriTextureRes.SetFromRenderTarget(distortionTexture)
             self.distortionJob.SetPostProcessVariable("Distortion", "TexDistortion", distortionTriTextureRes)
