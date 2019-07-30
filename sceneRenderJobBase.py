@@ -334,7 +334,6 @@ class SceneRenderJobBase(object):
             self.scene = None
         else:
             self.scene = blue.BluePythonWeakRef(scene)
-
         self._SetScene(scene)
 
     def CreateBasicRenderSteps(self):
