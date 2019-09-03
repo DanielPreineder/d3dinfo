@@ -720,7 +720,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if "aaQuality" not in self.overrideSettings:
             self.msaaQuality = self._GetMSAAQualityFromAAQuality(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
 
-        taaEnabled = gfxsettings.IsTAAEnabled(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING) and self.postProcessingQuality > 0)
+        taaEnabled = gfxsettings.IsTAAEnabled(gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING))
         self.taaEnabled = taaEnabled and _singletons.platformInfo.GetStaticCap(
             trinity.PlatformStaticCap.TAA) and trinity.GetShaderModel().endswith("DEPTH") and self.useTAA
 
