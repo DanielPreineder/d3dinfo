@@ -32,8 +32,16 @@ class SceneRenderJobBase(object):
         """
         Schedule the renderjob to run
         """
+        if not hasattr(self, "renderOrder"):
+            self.renderOrder = 0
         if not self.scheduled:
-            renderJobs.recurring.insert(0, self)
+            wantedIndex = 0
+            for index, rj in enumerate(renderJobs.recurring):
+                if hasattr(rj, "renderOrder") and self.renderOrder <= rj.renderOrder:
+                    wantedIndex += 1
+                else:
+                    break
+            renderJobs.recurring.insert(wantedIndex, self)
             self.scheduled = True
 
     def Pause(self):
@@ -308,6 +316,7 @@ class SceneRenderJobBase(object):
         self.viewport = None
 
         self.swapChain = None
+        self.renderOrder = 0
 
         # Always default-initialize the name of the renderjob
         self._ManualInit(name)
