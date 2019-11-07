@@ -157,6 +157,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         self.useImpostors = True
 
+        self.useReflectionProbe = True
+
     def Enable(self, schedule=True):
         SceneRenderJobBase.Enable(self, schedule)
         self.SetSettingsBasedOnPerformancePreferences()
@@ -869,7 +871,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         else:
             scene.nebulaBrightnessOverride = 0.0
 
-        scene.reflectionProbe = trinity.Tr2ReflectionProbe() if isHighQuality else None
+        scene.reflectionProbe = trinity.Tr2ReflectionProbe() if self.useReflectionProbe and isHighQuality else None
 
     def _GetPostProcessPSData(self):
         scene = self.GetScene()
