@@ -167,11 +167,13 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         SceneRenderJobBase.UnscheduleRecurring(self)
         self.scheduled = False
         self.EnableGpuEmission(False)
+        self.EnableUnRenderedSceneUpdate(True)
 
     def Start(self):
         SceneRenderJobBase.Start(self)
         self.EnableGpuEmission(True)
         self.ScheduleUpdateJob()
+        self.EnableUnRenderedSceneUpdate(False)
 
     def ScheduleUpdateJob(self):
         if self.updateJob is not None and not self.updateJob.scheduled:
@@ -278,6 +280,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         This function sets the scene and the scene key associated with it
         """
         self.SetScene(scene)
+        self.EnableUnRenderedSceneUpdate(not self.scheduled)
 
     def _SetDepthMap(self):
         """
@@ -421,9 +424,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             if each.name == key:
                 return each
 
-    def _CreateUpdateStep(self, step, name):
+    def _CreateUpdateStep(self, step, name, enabled=True):
         self.updateJob.steps.append(step)
         step.name = name
+        step.enabled = enabled
 
     def _CreateUpdateSteps(self):
         self._CreateUpdateStep(trinity.TriStepPushViewport(), "PUSH_VIEWPORT")
@@ -431,6 +435,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._CreateUpdateStep(trinity.TriStepPythonCB(), "CAMERA_UPDATE")
         self._CreateUpdateStep(trinity.TriStepSetView(), "SET_VIEW")
         self._CreateUpdateStep(trinity.TriStepSetProjection(), "SET_PROJECTION")
+        self._CreateUpdateStep(trinity.TriStepUpdate(self.GetScene()), "UPDATE_SCENE", enabled=False)
         self._CreateUpdateStep(trinity.TriStepPopViewport(), "POP_VIEWPORT")
 
     def SetBracketCurveSet(self, cs):
@@ -973,3 +978,11 @@ class SceneRenderJobSpace(SceneRenderJobBase):
                 self.AddStep("UPDATE_SCENE", trinity.TriStepUpdate(self.GetScene()))
             else:
                 self.RemoveStep("UPDATE_SCENE")
+
+    def EnableUnRenderedSceneUpdate(self, isEnabled):
+        if len(self.updateJob.steps) == 0:
+            self._CreateUpdateSteps()
+        updateStep = self.updateJob.steps.FindByName("UPDATE_SCENE")
+        updateStep.object = self.GetScene()
+        updateStep.enabled = isEnabled
+
