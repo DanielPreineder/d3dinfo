@@ -908,8 +908,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             scene = self.GetScene()
             if scene is not None:
                 if scene.postprocess:
-                    if self.taaEnabled and scene.postprocess.taa is None:
-                        scene.postprocess.taa = trinity.Tr2PPTaaEffect()
+                    if self.taaEnabled:
+                        if scene.postprocess.taa is None:
+                            scene.postprocess.taa = trinity.Tr2PPTaaEffect()
                     else:
                         scene.postprocess.taa = None
 
