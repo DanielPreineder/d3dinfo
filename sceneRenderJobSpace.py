@@ -985,6 +985,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
                 self.RemoveStep("UPDATE_SCENE")
 
     def EnableUnRenderedSceneUpdate(self, isEnabled):
+        if not self.updateJob:
+            return
         if len(self.updateJob.steps) == 0:
             self._CreateUpdateSteps()
         updateStep = self.updateJob.steps.FindByName("UPDATE_SCENE")
