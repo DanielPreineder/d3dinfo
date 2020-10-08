@@ -10,7 +10,7 @@ from .renderJob import CreateRenderJob
 
 logger = logging.getLogger(__name__)
 
-def CreateEmbeddedRenderJobSpace(name=None, stageKey=None):
+def CreateEmbeddedRenderJobSpace(name=None, stageKey=None,usePostProcessing=True):
     """
     We can't use __init__ on a decorated class, so we provide a creation function that does it for us
     """
@@ -20,9 +20,11 @@ def CreateEmbeddedRenderJobSpace(name=None, stageKey=None):
     else:
         newRJ.ManualInit()
 
+    newRJ.embeddedPostprocessing = usePostProcessing
+
     newRJ.SetMultiViewStage(stageKey)
     return newRJ
-        
+
 
 class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
     """
@@ -38,7 +40,9 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
     renderStepOrder += [
         "POP_RENDER_TARGET",
         "POP_DEPTH_STENCIL",
-        "COPY_TO_BLIT_TEXTURE", 
+        "PUSH_POSTPROCESSING_RENDER_TARGET",
+        "RJ_POSTPROCESSING_EMBEDDED",
+        "POP_POSTPROCESSING_RENDER_TARGET",
         "PUSH_BLIT_DEPTH",
         "SET_BLIT_VIEWPORT",
         "SET_BLENDMODE",
@@ -62,12 +66,15 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
         self.rtHeight = 0
 
         self.blitViewport = trinity.TriViewport()
-        
+
         SceneRenderJobSpace._ManualInit(self, name)
         self.updateJob = None
         self.useTAA = False
         self.useImpostors = False
         self.useReflectionProbe = False
+
+        self.embeddedPostprocessing = True
+
 
     def SetupStencilBlitEffect(self):
         self.stencilBlitEffect = trinity.Tr2Effect()
@@ -117,7 +124,7 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
 
     def DoPrepareResources(self):
         """
-        This function is called when the device is restored. 
+        This function is called when the device is restored.
         This function may raise exceptions attempting to create resources!
         NB: Will need to be changed to allow other sources to provide the buffers
         """
@@ -130,31 +137,10 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
             log.LogException()
             self.DoReleaseResources(1)
 
-    def _GetSettings(self):
-        """ See SceneRenderJobSpace._GetSettings """
-        currentSettings = SceneRenderJobSpace._GetSettings(self)
-        currentSettings["postProcessingQuality"] = 0
-
-        return currentSettings
-
-    def _SetSettingsBasedOnPerformancePreferences(self):
-        SceneRenderJobSpace._SetSettingsBasedOnPerformancePreferences(self)
-
-        # These are currently disabled
-        self.usePostProcessing = False
-
     def _GetSourceRTForPostProcessing(self):
         if self.msaaEnabled or self.hdrEnabled:
             return self.customBackBuffer
         return self.finalTexture
-
-    def _GetDestinationRTForPostProcessing(self):
-        if self.customBackBuffer is not None:
-            return self.customBackBuffer
-        elif self.offscreenRenderTarget is not None:
-            return self.offscreenRenderTarget
-
-        return None
 
     def _CreateRenderTargets(self):
         if not self.prepared:
@@ -168,17 +154,23 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
         self.rtHeight = vp.height
 
         if self.customBackBuffer is None:
-            self.offscreenRenderTarget = trinity.Tr2RenderTarget(
-                    vp.width, vp.height, 1, self.bbFormat)
+            self.offscreenRenderTarget = trinity.Tr2RenderTarget(vp.width, vp.height, 1, self.bbFormat)
             self.finalTexture = self.offscreenRenderTarget
         else:
             self.finalTexture = trinity.Tr2RenderTarget(vp.width, vp.height, 1, self.customBackBuffer.format)
 
+        if (self.msaaEnabled or self.hdrEnabled) and not self._UsePostProcessingEmbedded():
+            self.finalTexture = self.customBackBuffer
+
         if self.customDepthStencil is None:
             self.offscreenDepthStencil = trinity.Tr2DepthStencil(
-                    vp.width, vp.height, trinity.DEPTH_STENCIL_FORMAT.AUTO)
+                vp.width, vp.height, trinity.DEPTH_STENCIL_FORMAT.AUTO)
 
         self.finalTexture.name = 'finalTexture'
+
+
+    def _UsePostProcessingEmbedded(self):
+        return self.usePostProcessing and self.embeddedPostprocessing
 
     def SetRenderTargets(self, *args):
         SceneRenderJobSpace.SetRenderTargets(self, *args)
@@ -192,11 +184,14 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
         self.RemoveStep("FINAL_BLIT_EMBEDDED")
         self.RemoveStep("PUSH_BLIT_DEPTH")
         self.RemoveStep("POP_BLIT_DEPTH")
+        self.RemoveStep("PUSH_POSTPROCESSING_RENDER_TARGET")
+        self.RemoveStep("RJ_POSTPROCESSING_EMBEDDED")
+        self.RemoveStep("POP_POSTPROCESSING_RENDER_TARGET")
 
         viewport = self.GetViewport()
 
         if viewport is not None:
-            vpStep = self.GetStep( 'SET_VIEWPORT' )
+            vpStep = self.GetStep('SET_VIEWPORT')
             if vpStep is not None:
                 vpOrigin = trinity.TriViewport(0, 0, viewport.width, viewport.height)
                 vpStep.viewport = vpOrigin
@@ -212,10 +207,16 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
 
         self.AddStep("PUSH_BLIT_DEPTH", trinity.TriStepPushDepthStencil(None))
         self.RemoveStep("FINAL_BLIT")
-        if self.customBackBuffer is not None and self.finalTexture is not None:
-            step = trinity.TriStepResolve(self.finalTexture, self.customBackBuffer)
-            step.name = 'Resolve: finalTexture <== customBackBuffer'
-            self.AddStep("COPY_TO_BLIT_TEXTURE", step)
+
+
+        if self._UsePostProcessingEmbedded():
+            self.AddStep("RJ_POSTPROCESSING_EMBEDDED",trinity.TriStepRenderPostProcess(self.GetScene(), self._GetSourceRTForPostProcessing()))
+
+            if self.finalTexture:
+                self.AddStep("PUSH_POSTPROCESSING_RENDER_TARGET",trinity.TriStepPushRenderTarget(self.finalTexture))
+                self.AddStep("POP_POSTPROCESSING_RENDER_TARGET", trinity.TriStepPopRenderTarget())
+
+
 
         if self.doFinalBlit:
             self.AddStep("SET_BLIT_VIEWPORT", trinity.TriStepSetViewport(viewport))
@@ -224,9 +225,7 @@ class SceneRenderJobSpaceEmbedded(SceneRenderJobSpace):
                 if self.stencilPath is None or self.stencilPath == "":
                     self.AddStep("FINAL_BLIT_EMBEDDED", trinity.TriStepRenderTexture(self.finalTexture))
                 else:
-                    stencilTriTextureRes = trinity.TriTextureRes()
-                    stencilTriTextureRes.SetFromRenderTarget(self.finalTexture)
-                    self.blitMapParameter.SetResource(stencilTriTextureRes)
+                    self.blitMapParameter.SetResource(self.finalTexture)
                     self.AddStep("FINAL_BLIT_EMBEDDED", trinity.TriStepRenderEffect(self.stencilBlitEffect))
 
         self.AddStep("POP_BLIT_DEPTH", trinity.TriStepPopDepthStencil())
