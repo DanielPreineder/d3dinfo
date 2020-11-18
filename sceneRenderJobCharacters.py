@@ -177,10 +177,10 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
     def SetCameraUpdate(self, job):
         self.AddStep("UPDATE_CAMERA", trinity.TriStepRunJob(job))
 
-    def Set2DBackdropScene(self, backdrop):
-        if backdrop is not None:
-            self.AddStep("UPDATE_BACKDROP", trinity.TriStepUpdate(backdrop))
-            self.AddStep("RENDER_BACKDROP", trinity.TriStepRenderScene(backdrop))
+    def Set2DBackdropUIRoot(self, uiRoot):
+        if uiRoot is not None:
+            self.AddStep("UPDATE_BACKDROP", trinity.TriStepUpdate(uiRoot.GetRenderObject()))
+            self.AddStep("RENDER_BACKDROP", trinity.TriStepRenderScene(uiRoot.GetRenderObject()))
         else:
             self.RemoveStep("UPDATE_BACKDROP")
             self.RemoveStep("RENDER_BACKDROP")
