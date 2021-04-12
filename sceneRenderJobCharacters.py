@@ -4,8 +4,10 @@ from .sceneRenderJobBase import SceneRenderJobBase
 from .renderJobUtils import renderTargetManager as rtm
 from . import _singletons
 from . import _trinity as trinity
-
+import trinity.evePostProcess
+import charactercreator.client.grading as grading
 # paperDoll is imported later on, wth!
+
 
 
 def CreateSceneRenderJobCharacters(name=None):
@@ -35,6 +37,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         "UPDATE_BACKDROP",
         "UPDATE_CAMERA",
         "UPDATE_SECONDARY_CAMERAS",
+        "SET_BG_LAYER",
         "SET_BACKBUFFER",
         "SET_DEPTH_STENCIL",
         "SET_VIEWPORT",
@@ -48,9 +51,36 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         "RESTORE_BACKBUFFER",
         "RESTORE_DEPTH_STENCIL",
         "RESOLVE_IMAGE",
+        "RJ_POSTPROCESSING",
+        "SET_BLITCURRENT",
+        "SET_BLITORIGINAL",
+        "RENDER_BLEND",
         "RENDER_TOOLS",
         "RENDER_UI",
     ]
+
+    def setupPostProcess(self):
+        resolveTarget = self.GetBackBufferRenderTarget()
+        self.resolveTargetDimensions = (resolveTarget.width, resolveTarget.height)
+        if self.postProcess is None:
+            self.postProcess = grading.PostProcess('res:/dx9/scene/postprocess/portraitLUT.red', resolveTarget, viewport=self.viewport)
+            self.AddStep("RJ_POSTPROCESSING", trinity.TriStepRunJob(self.postProcess.GetJob()))
+        lut = grading.GetTexLUT(self)
+        if lut is not None:
+            lut.resourcePath = self.lut_res_path
+
+    def UpdatePostProcessingTexCoords(self):
+        step = grading.GetLUTStepRenderEffect(self.postProcess.GetJob())
+        texcoords = None
+        if hasattr(self, "viewport") and hasattr(self, 'resolveTargetDimensions') and step is not None and self.viewport is not None and self.viewport.object is not None:
+            texcoords_top = float(self.viewport.object.y) / self.resolveTargetDimensions[1]
+            texcoords_left = float(self.viewport.object.x) / self.resolveTargetDimensions[0]
+            texcoords_bottom = float(self.viewport.object.y + self.viewport.object.height) / self.resolveTargetDimensions[1]
+            texcoords_right = float(self.viewport.object.x + self.viewport.object.width) / self.resolveTargetDimensions[0]
+            texcoords = (texcoords_left, texcoords_top, texcoords_right, texcoords_bottom)
+        if texcoords is not None:
+            step.tlTexCoord = (texcoords[0], texcoords[1])
+            step.brTexCoord = (texcoords[2], texcoords[3])
 
     def _ManualInit(self, name="SceneRenderJobCharacters"):
         """
@@ -64,6 +94,12 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         self.customBackBuffer = None
         self.customDepthStencil = None
         self.resolveBuffer = None
+        self.lut_res_path = "res:/dx9/scene/postprocess/NCC_normal.dds"
+        self.postProcess = None
+        self.startOpacity = 1.0
+        self.dx9_active = trinity.platform == "dx9"
+        self.releasing = False
+        self.rebuilding = False
 
     def _SetScene(self, scene):
         """
@@ -86,13 +122,14 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         """
         This function is called when the device is lost.
         """
+
         self.customBackBuffer = None
         self.customDepthStencil = None
         self.resolveBuffer = None
+        self.bgBuffer = None
+        if self.postProcess is not None:
+            self.postProcess.job.Release()
 
-        self.RemoveStep("SET_BACKBUFFER")
-        self.RemoveStep("SET_DEPTH_STENCIL")
-        self.RemoveStep("RESOLVE_IMAGE")
 
     def DoPrepareResources(self):
         """
@@ -106,19 +143,17 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             return
 
         viewport = self.GetViewport()
-
-        if viewport:
-            self.SetStepAttr("CLEAR", "isColorCleared", False)
-        else:
-            self.SetStepAttr("CLEAR", "isColorCleared", True)
-
-        if viewport:
+        self.SetStepAttr("CLEAR", "isColorCleared", True)
+        if self.dx9_active:
             msaaType = 1
         elif sm.IsServiceRunning("device"):
             aaQuality = gfxsettings.Get(gfxsettings.GFX_ANTI_ALIASING)
             msaaType = sm.GetService("device").GetMSAATypeFromQuality(aaQuality)
         else:
             msaaType = 4
+
+        if msaaType <= 1:
+            self.SetStepAttr("CLEAR", "isColorCleared", False)
 
         width, height = self.GetBackBufferSize()
 
@@ -130,6 +165,14 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         self.AddStep("SET_DEPTH_STENCIL", trinity.TriStepPushDepthStencil(self.customDepthStencil))
         self.AddStep("RESTORE_DEPTH_STENCIL", trinity.TriStepPopDepthStencil())
 
+        if viewport:
+            self.bgBuffer = rtm.GetRenderTargetAL(width, height, 1, bbFormat)
+            self.AddStep("SET_BG_LAYER", trinity.TriStepResolve(self.bgBuffer, self.GetBackBufferRenderTarget()))
+            self.AddStep("SET_BLITORIGINAL", trinity.TriStepSetVariableStore("BlitOriginal", self.bgBuffer))
+            self.setupPostProcess()
+            self.AddStep("SET_BLITCURRENT", trinity.TriStepSetVariableStore("BlitCurrent", self.postProcess.GetJob().resolveTarget))
+            self.AddStep("RENDER_BLEND", trinity.TriStepRenderEffect(self.CreateRenderBlendEffect(msaaType)))
+
         if msaaType <= 1:
             self.RemoveStep("SET_BACKBUFFER")
             self.RemoveStep("RESTORE_BACKBUFFER")
@@ -137,16 +180,19 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         else:
             self.customBackBuffer = rtm.GetRenderTargetMsaaAL(width, height, bbFormat, msaaType, 0)
             self.AddStep("SET_BACKBUFFER", trinity.TriStepPushRenderTarget(self.customBackBuffer))
-
             self.AddStep("RESTORE_BACKBUFFER", trinity.TriStepPopRenderTarget())
 
             self.AddStep("RESOLVE_IMAGE", trinity.TriStepResolve(self.GetBackBufferRenderTarget(), self.customBackBuffer))
 
-    def UpdateViewport(self, viewport):
+
+    def UpdateViewport(self, new_viewport):
         if not self.customDepthStencil:
             return
-        if viewport.width != self.customDepthStencil.width or viewport.height != self.customDepthStencil.height:
+        viewport = self.GetViewport()
+        if viewport is None or new_viewport.width != viewport.width or new_viewport.height != viewport.height:
             self.SetSettingsBasedOnPerformancePreferences()
+        else:
+            self.UpdatePostProcessingTexCoords()
 
     def Enable(self, schedule=True):
         SceneRenderJobBase.Enable(self, schedule)
@@ -202,3 +248,19 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             self.AddStep("UPDATE_SCENE", trinity.TriStepUpdate(self.GetScene()))
         else:
             self.RemoveStep("UPDATE_SCENE")
+
+    def SetStartOpacity(self, value):
+        self.startOpacity = value
+
+    def CreateRenderBlendEffect(self, msaaType):
+        effect = trinity.Tr2Effect()
+        if msaaType > 1:
+            effect.effectFilePath = "res:/graphics/Effect/Managed/Space/PostProcess/OriginalFade.fx"
+        else:
+            effect.effectFilePath = "res:/graphics/Effect/Managed/Space/PostProcess/OriginalFade_noalpha.fx"
+        param = trinity.Tr2FloatParameter()
+        param.name = "Opacity"
+        param.value = self.startOpacity
+        effect.parameters.append(param)
+
+        return effect

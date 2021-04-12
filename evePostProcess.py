@@ -64,6 +64,8 @@ class EvePostProcess(object):
         self.buffer1 = None
         self.buffer2 = None
 
+        self.viewport = None
+
     def RemoveSteps(self, rj):
         """ Removes all steps belonging to this post process from the renderjob. """
         for each in self.steps:
@@ -114,7 +116,7 @@ class EvePostProcess(object):
                 continue
             each.shaderBuffer = psData
 
-    def AddSteps(self, rj, psData):
+    def AddSteps(self, rj, psData, texcoords=None):
         """
         Appends all steps neccessary to render this post process to the renderjob.
         """
@@ -130,6 +132,7 @@ class EvePostProcess(object):
 
             for i in range(1, len(effects) - 1):
                 self._AppendStep(rj, trinity.TriStepSetRenderTarget(self.buffer2), "Swap RT")
+                self._AppendStep(rj, trinity.TriStepSetViewport(self.viewport), "Set Viewport")
                 self._AppendStep(rj, trinity.TriStepSetVariableStore("BlitCurrent", self.buffer1), "Override var BlitCurrent")
                 self._AppendStep(rj, trinity.TriStepRenderEffect(effects[i], psData), effects[i].name)
                 self._SwapBuffers()
@@ -140,7 +143,8 @@ class EvePostProcess(object):
             value = (1.0 / self.sourceSize[0], 1.0 / self.sourceSize[1], self.sourceSize[0], self.sourceSize[1])
             self._AppendStep(rj, trinity.TriStepSetVariableStore("g_texelSize", value), "Set source texelSize")
 
-        self._AppendStep(rj, trinity.TriStepRenderEffect(effects[-1]), effects[-1].name)
+        step = trinity.TriStepRenderEffect(effects[-1])
+        self._AppendStep(rj, step , effects[-1].name)
 
     def _ClearSteps(self):
         del self.steps[:]
@@ -333,7 +337,13 @@ class EvePostProcessingJob(object):
         #Set the variable store, these are used by all eve space postprocessing
         self._AppendStep("Set var BlitOriginal", trinity.TriStepSetVariableStore("BlitOriginal", self.resolveTarget), job)
         self._AppendStep("Set var BlitCurrent", trinity.TriStepSetVariableStore("BlitCurrent", self.resolveTarget), job)
-        pp.AddSteps(job, self.postProcessPSData)
+
+        texcoords = None
+
+        if hasattr(self, "viewport") and self.viewport.object is not None:
+            self._AppendStep("Set Viewport", trinity.TriStepSetViewport(self.viewport.object), job)
+
+        pp.AddSteps(job, self.postProcessPSData, texcoords)
 
         self._AppendStep(job.name, trinity.TriStepRunJob(job))
 
@@ -343,7 +353,7 @@ class EvePostProcessingJob(object):
             if pp is not None:
                 pp.SetPSData(psData)
 
-    def Prepare(self, source, blitTexture, destination=None):
+    def Prepare(self, source, blitTexture, destination=None, viewport=None):
         """
         Prepare the renderjob and it's post processes.
         (source) -> The source image used for post processing
@@ -356,6 +366,8 @@ class EvePostProcessingJob(object):
         self.resolveTarget = blitTexture
         self.source = source
         self.destination = destination
+        if viewport is not None:
+            self.viewport = viewport
         for each in self.postProcesses:
             if each is not None:
                 each.Prepare(source)
