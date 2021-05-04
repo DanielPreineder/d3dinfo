@@ -70,17 +70,18 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             lut.resourcePath = self.lut_res_path
 
     def UpdatePostProcessingTexCoords(self):
-        step = grading.GetLUTStepRenderEffect(self.postProcess.GetJob())
-        texcoords = None
-        if hasattr(self, "viewport") and hasattr(self, 'resolveTargetDimensions') and step is not None and self.viewport is not None and self.viewport.object is not None:
-            texcoords_top = float(self.viewport.object.y) / self.resolveTargetDimensions[1]
-            texcoords_left = float(self.viewport.object.x) / self.resolveTargetDimensions[0]
-            texcoords_bottom = float(self.viewport.object.y + self.viewport.object.height) / self.resolveTargetDimensions[1]
-            texcoords_right = float(self.viewport.object.x + self.viewport.object.width) / self.resolveTargetDimensions[0]
-            texcoords = (texcoords_left, texcoords_top, texcoords_right, texcoords_bottom)
-        if texcoords is not None:
-            step.tlTexCoord = (texcoords[0], texcoords[1])
-            step.brTexCoord = (texcoords[2], texcoords[3])
+        if self.postProcess is not None:
+            step = grading.GetLUTStepRenderEffect(self.postProcess.GetJob())
+            texcoords = None
+            if hasattr(self, "viewport") and hasattr(self, 'resolveTargetDimensions') and step is not None and self.viewport is not None and self.viewport.object is not None:
+                texcoords_top = float(self.viewport.object.y) / self.resolveTargetDimensions[1]
+                texcoords_left = float(self.viewport.object.x) / self.resolveTargetDimensions[0]
+                texcoords_bottom = float(self.viewport.object.y + self.viewport.object.height) / self.resolveTargetDimensions[1]
+                texcoords_right = float(self.viewport.object.x + self.viewport.object.width) / self.resolveTargetDimensions[0]
+                texcoords = (texcoords_left, texcoords_top, texcoords_right, texcoords_bottom)
+            if texcoords is not None:
+                step.tlTexCoord = (texcoords[0], texcoords[1])
+                step.brTexCoord = (texcoords[2], texcoords[3])
 
     def _ManualInit(self, name="SceneRenderJobCharacters"):
         """
