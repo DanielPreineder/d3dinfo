@@ -874,7 +874,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         else:
             scene.msaaSamples = 1
         if _singletons.platformInfo.GetStaticCap(trinity.PlatformStaticCap.COMPUTE) and self.postProcessingQuality == 2:
-            scene.nebulaBrightnessOverride = 2.0
+            scene.nebulaBrightnessOverride = 1.35
         else:
             scene.nebulaBrightnessOverride = 0.0
 
