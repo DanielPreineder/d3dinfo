@@ -7,6 +7,7 @@ from . import _trinity as trinity
 import trinity.evePostProcess
 import charactercreator.client.grading as grading
 import blue
+import uthread
 # paperDoll is imported later on, wth!
 
 
@@ -111,9 +112,19 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         else:
             self.pp_viewport.object.height = self.viewport.object.height
 
-    def UpdatePostProcessingTexCoords(self):
+    def _UpdatePostProcessingTexCoords(self):
+        blue.synchro.Yield()
         if self.postProcess is not None:
-            step = grading.GetLUTStepRenderEffect(self.postProcess.GetJob())
+            step = None
+            attempts = 0
+            while step is None and attempts < 50:
+                step = grading.GetLUTStepRenderEffect(self.postProcess.GetJob())
+                if step is None:
+                    blue.synchro.Sleep(10)
+
+            if step is None:
+                return
+
             texcoords = None
             if hasattr(self, "pp_viewport") and hasattr(self, 'resolveTargetDimensions') and step is not None and self.pp_viewport is not None and self.pp_viewport.object is not None:
                 self.derive_pp_viewport()
@@ -127,6 +138,10 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
                 step.brTexCoord = (texcoords[2], texcoords[3])
 
             self.postProcess.UpdateViewport(self.pp_viewport.object)
+
+    def UpdatePostProcessingTexCoords(self):
+        uthread.new(self._UpdatePostProcessingTexCoords)
+
 
     def _ManualInit(self, name="SceneRenderJobCharacters"):
         """
@@ -172,13 +187,10 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         """
         This function is called when the device is lost.
         """
-
         self.customBackBuffer = None
         self.customDepthStencil = None
         self.resolveBuffer = None
         self.bgBuffer = None
-        if self.postProcess is not None:
-            self.postProcess.job.Release()
 
 
     def DoPrepareResources(self):
@@ -227,9 +239,36 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         self.UpdatePostProcessingTexCoords()
 
 
+    def CropVPObj(self, viewport_obj, target_vp_obj):
+        target_vp_obj.x = viewport_obj.x
+        target_vp_obj.y = viewport_obj.y
+        target_vp_obj.width = viewport_obj.width
+        target_vp_obj.height = viewport_obj.height
+
+        if viewport_obj.x < 0:
+            target_vp_obj.x = 0
+            target_vp_obj.width = viewport_obj.width + viewport_obj.x
+
+        if viewport_obj.y < 0:
+            target_vp_obj.y = 0
+            target_vp_obj.height = viewport_obj.height + viewport_obj.y
+
+    def CropLocalVPObj(self, viewport_obj, target_vp_obj):
+        target_vp_obj.x = viewport_obj.x
+        target_vp_obj.y = viewport_obj.y
+        target_vp_obj.width = viewport_obj.width
+        target_vp_obj.height = viewport_obj.height
+
+        if self.cropped_scr_vp_obj.x == 0:
+            target_vp_obj.width = self.cropped_scr_vp_obj.width
+            target_vp_obj.x = viewport_obj.width - target_vp_obj.width
+
+        if self.cropped_scr_vp_obj.y == 0:
+            target_vp_obj.height = self.cropped_scr_vp_obj.height
+            target_vp_obj.y = viewport_obj.height - target_vp_obj.height
+
     def SetupPasses(self, viewport, msaaType, width, height):
         self.enabled = False
-
         bbFormat = _singletons.device.GetRenderContext().GetBackBufferFormat()
         dsFormat = trinity.DEPTH_STENCIL_FORMAT.D24S8
 
@@ -254,7 +293,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
                 else:
                     self.customBackBuffer = rtm.GetRenderTargetMsaaAL(width, height, bbFormat, msaaType, 0, index=3)
             self.AddStep("SET_BACKBUFFER", trinity.TriStepPushRenderTarget(self.customBackBuffer))
-            self.AddStep("SET_BG_LAYER", trinity.TriStepCopyRenderTarget(self.bgBuffer, self.GetBackBufferRenderTarget(), self.local_vp_obj, self.scr_vp_obj))
+            self.AddStep("SET_BG_LAYER", trinity.TriStepCopyRenderTarget(self.bgBuffer, self.GetBackBufferRenderTarget(), self.cropped_local_vp_obj, self.cropped_scr_vp_obj))
             if msaaType <= 1:
                 self.AddStep("PLACE_BG", trinity.TriStepCopyRenderTarget(self.customBackBuffer, self.GetBackBufferRenderTarget(), self.local_vp_obj, self.scr_vp_obj))
             if not self.supersampling:
@@ -342,6 +381,8 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             self.scr_vp.object.height = viewport.height
             self.scr_vp.object.minZ = viewport.minZ
             self.scr_vp.object.maxZ = viewport.maxZ
+            self.cropped_scr_vp_obj = trinity.TriViewport()
+            self.CropVPObj(self.scr_vp_obj, self.cropped_scr_vp_obj)
             self.local_vp_obj = trinity.TriViewport()
             self.local_vp = blue.BluePythonWeakRef(self.local_vp_obj)
             self.local_vp.object.x = 0
@@ -362,6 +403,8 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             self.local_scale_vp.object.height = viewport.height
             self.local_scale_vp.object.minZ = viewport.minZ
             self.local_scale_vp.object.maxZ = viewport.maxZ
+            self.cropped_local_vp_obj = trinity.TriViewport()
+            self.CropLocalVPObj(self.local_scale_vp_obj, self.cropped_local_vp_obj)
             width, height = viewport.width, viewport.height
             if not self.dx9_active:
                 self._SetViewport(self.local_vp_obj)
@@ -370,15 +413,11 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
 
         return width, height
 
-    def UpdateBufferedViewports(self, new_viewport):
-        self.scr_vp_obj.x = new_viewport.x
-        self.scr_vp_obj.y = new_viewport.y
-
     def UpdateSteps(self):
         if not self.dx9_active:
             self.RemoveStep("SET_BG_LAYER")
             self.RemoveStep("PLACE_BG")
-            self.AddStep("SET_BG_LAYER", trinity.TriStepCopyRenderTarget(self.bgBuffer, self.GetBackBufferRenderTarget(), self.local_vp_obj, self.scr_vp_obj))
+            self.AddStep("SET_BG_LAYER", trinity.TriStepCopyRenderTarget(self.bgBuffer, self.GetBackBufferRenderTarget(), self.cropped_local_vp_obj, self.cropped_scr_vp_obj))
             if self.msaaType <= 1:
                 self.AddStep("PLACE_BG", trinity.TriStepCopyRenderTarget(self.customBackBuffer, self.GetBackBufferRenderTarget(), self.local_vp_obj, self.scr_vp_obj))
             self.RemoveStep("PLACE_AVATAR")
@@ -390,13 +429,14 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
 
     def UpdateViewport(self, new_viewport):
         viewport = self.scr_vp_obj
+        self.CropVPObj(self.scr_vp_obj, self.cropped_scr_vp_obj)
+        self.CropLocalVPObj(self.local_vp_obj, self.cropped_local_vp_obj)
         msaaType, aaQuality = self.GetMSAAType()
         if viewport is None or new_viewport.width != viewport.width or new_viewport.height != viewport.height or self.msaaType != msaaType or self.aaQuality != aaQuality or self.customDepthStencil is None:
             self.SetViewport(new_viewport)
             self.SetSettingsBasedOnPerformancePreferences()
         else:
             self.SetViewport(new_viewport)
-            self.UpdateBufferedViewports(new_viewport)
             self.UpdateSteps()
             self.UpdatePostProcessingTexCoords()
 
@@ -405,7 +445,6 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         """
         Sets the main viewport.
         """
-
         if viewport is None:
             self.RemoveStep("SET_VIEWPORT")
             self.viewport = None
