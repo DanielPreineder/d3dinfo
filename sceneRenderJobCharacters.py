@@ -62,6 +62,12 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         "RENDER_SCALE",
         "POP_RENDER_SCALE_RT",
         "POP_RENDER_SCALE_DS",
+        "PUSH_TRANS_RT",
+        "PUSH_TRANS_DS",
+        "CLEAR_TRANSOUTPUT",
+        "RENDER_TRANSMISSION",
+        "POP_TRANS_RT",
+        "POP_TRANS_DS",
         "RESOLVE_IMAGE",
         "SET_BLENDSOURCE",
         "PUSH_RENDER_BLEND_RT",
@@ -286,6 +292,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             if self.dx9_active:
                 self.customBackBuffer = rtm.GetRenderTargetAL(width, height, 1, bbFormat, index=3)
             else:
+                self.transOutput = rtm.GetRenderTargetAL(width, height, 1, bbFormat, index=5)
                 if self.supersampling:
                     # NOTE that for AA_QUALITY_TAA_HIGH we are forcing MSAA to 1 with this even though the variable says 4!
                     self.customBackBuffer = rtm.GetRenderTargetAL(width * AA_SCALE_FACTOR, height * AA_SCALE_FACTOR, 1, bbFormat, index=3)
@@ -296,10 +303,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             self.AddStep("SET_BG_LAYER", trinity.TriStepCopyRenderTarget(self.bgBuffer, self.GetBackBufferRenderTarget(), self.cropped_local_vp_obj, self.cropped_scr_vp_obj))
             if msaaType <= 1:
                 self.AddStep("PLACE_BG", trinity.TriStepCopyRenderTarget(self.customBackBuffer, self.GetBackBufferRenderTarget(), self.cropped_local_vp_obj, self.cropped_scr_vp_obj))
-            if not self.supersampling:
-                self.AddStep("RESOLVE_IMAGE", trinity.TriStepResolve(self.blendsource, self.customBackBuffer))
-            else:
-                self.AddStep("RESOLVE_IMAGE", trinity.TriStepResolve(self.blendsource, self.customBackBuffer2))
+            self.AddStep("RESOLVE_IMAGE", trinity.TriStepResolve(self.blendsource, self.transOutput))
             if self.supersampling:
                 self.AddStep("PUSH_RENDER_SCALE_RT", trinity.TriStepPushRenderTarget(self.customBackBuffer2))
                 self.AddStep("PUSH_RENDER_SCALE_DS", trinity.TriStepPushDepthStencil(None))
@@ -326,6 +330,16 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             self.AddStep("POP_RENDER_BLEND_RT", trinity.TriStepPopRenderTarget())
             self.AddStep("POP_RENDER_BLEND_DS", trinity.TriStepPopDepthStencil())
             self.setupPostProcess()
+            self.AddStep("CLEAR_TRANSOUTPUT", trinity.TriStepClear((0.0, 0.0, 0.0, 0.0), 1.0))
+            self.SetStepAttr("CLEAR_TRANSOUTPUT", "isColorCleared", True)
+            self.AddStep("PUSH_TRANS_RT", trinity.TriStepPushRenderTarget(self.transOutput))
+            self.AddStep("PUSH_TRANS_DS", trinity.TriStepPushDepthStencil(None))
+            if self.supersampling:
+                self.AddStep("RENDER_TRANSMISSION", trinity.TriStepRenderEffect(self.CreateTransmissionEffect(self.customBackBuffer2)))
+            else:
+                self.AddStep("RENDER_TRANSMISSION", trinity.TriStepRenderEffect(self.CreateTransmissionEffect(self.customBackBuffer)))
+            self.AddStep("POP_TRANS_RT", trinity.TriStepPopRenderTarget())
+            self.AddStep("POP_TRANS_DS", trinity.TriStepPopDepthStencil())
             self.AddStep("RESTORE_BACKBUFFER", trinity.TriStepPopRenderTarget())
         else:
             if msaaType <= 1:
@@ -560,3 +574,48 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         self.RemoveStep("SET_PP_VIEWPORT")
         self.RemoveStep("RJ_POSTPROCESSING")
         self.setupPostProcess()
+
+    def CreateTransmissionEffect(self, rt_buffer):
+        effect = trinity.Tr2Effect()
+        effect.StartUpdate()
+        effect.effectFilePath = "res:/graphics/Effect/Managed/Space/PostProcess/DigiScramble.fx"
+        param = trinity.Tr2FloatParameter()
+        param.name = "Amount"
+        param.value = 0.0
+        effect.parameters.append(param)
+
+
+        self.scrambleSourceRes = trinity.TriTextureParameter()
+        self.scrambleSourceRes.name = "ScrambleSource"
+        self.scrambleSourceRes.SetResource(trinity.TriTextureRes(rt_buffer))
+        effect.resources.append(self.scrambleSourceRes)
+        effect.EndUpdate()
+
+        self.scrambleCurveSet = trinity.TriCurveSet()
+        self.scrambleCurveSet.name = "ScrambleCurveSet"
+        self.scrambleCurveSet.playOnLoad = False
+
+        scrambleExpression = trinity.Tr2CurveScalarExpression()
+        scrambleExpression.name = "ScrambleExpression"
+        scrambleExpression.expression = "clamp(2 - time, 0, 1) * randhash(0.5, 1, time)"
+
+        scrambleExpressionBinding = trinity.TriValueBinding()
+        scrambleExpressionBinding.name = "ScrambleExpressionBinding"
+        scrambleExpressionBinding.sourceAttribute = "currentValue"
+        scrambleExpressionBinding.destinationAttribute = "value"
+        scrambleExpressionBinding.sourceObject = scrambleExpression
+        scrambleExpressionBinding.destinationObject = param
+
+        self.scrambleCurveSet.bindings.append(scrambleExpressionBinding)
+        self.scrambleCurveSet.curves.append(scrambleExpression)
+
+        return effect
+
+    def PlaceTransmissionEffectInScene(self, scene):
+        scrambleCurveSet = None
+        for curveSet in scene.curveSets:
+            if curveSet.name == "ScrambleCurveSet":
+                scrambleCurveSet = curveSet
+
+        if scrambleCurveSet is None:
+            scene.curveSets.append(self.scrambleCurveSet)
