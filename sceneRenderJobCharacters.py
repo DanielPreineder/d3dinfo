@@ -132,7 +132,9 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
                 return
 
             texcoords = None
-            if hasattr(self, "pp_viewport") and hasattr(self, 'resolveTargetDimensions') and step is not None and self.pp_viewport is not None and self.pp_viewport.object is not None:
+            if hasattr(self, "pp_viewport") and hasattr(self, 'resolveTargetDimensions') and hasattr(self, 'viewport')\
+                    and self.viewport is not None and self.viewport.object is not None and step is not None and \
+                    self.pp_viewport is not None and self.pp_viewport.object is not None:
                 self.derive_pp_viewport()
                 texcoords_top = float(self.pp_viewport.object.y) / self.resolveTargetDimensions[1]
                 texcoords_left = float(self.pp_viewport.object.x) / self.resolveTargetDimensions[0]
@@ -143,7 +145,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
                 step.tlTexCoord = (texcoords[0], texcoords[1])
                 step.brTexCoord = (texcoords[2], texcoords[3])
 
-            self.postProcess.UpdateViewport(self.pp_viewport.object)
+                self.postProcess.UpdateViewport(self.pp_viewport.object)
 
     def UpdatePostProcessingTexCoords(self):
         uthread.new(self._UpdatePostProcessingTexCoords)
@@ -597,7 +599,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
 
         scrambleExpression = trinity.Tr2CurveScalarExpression()
         scrambleExpression.name = "ScrambleExpression"
-        scrambleExpression.expression = "clamp(2 - time, 0, 1) * randhash(0.5, 1, time)"
+        scrambleExpression.expression = "(clamp(2 - time, 0, 0.7) + 0.3) * randhash(0.5, 1, time)"
 
         scrambleExpressionBinding = trinity.TriValueBinding()
         scrambleExpressionBinding.name = "ScrambleExpressionBinding"
