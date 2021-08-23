@@ -8,7 +8,7 @@ Python module for importing and exposing types from the trinity dll/pyd.
 
 import logging as _logging
 import os as _os
-import sys as _sys
+import platform as _platform
 
 import blue as _blue
 
@@ -24,17 +24,12 @@ _logger = _logging.getLogger('trinity')
 
 from . import availablePlatforms, _utils
 
-if _blue.pyos.packaged:
+if _platform.system() == "Darwin":
+    DEFAULT_TRI_PLATFORM = "metal"
+elif _platform.system() == "Windows":
     DEFAULT_TRI_PLATFORM = "dx11"
-    DEFAULT_TRI_TYPE = "deploy"
-    VALID_TRI_TYPES = ["deploy"]
 else:
-    if _sys.platform.startswith("linux") or _sys.platform.startswith("darwin"):
-        DEFAULT_TRI_PLATFORM = "gles2"
-    else:
-        DEFAULT_TRI_PLATFORM = "dx11"
-    DEFAULT_TRI_TYPE = "internal"
-    VALID_TRI_TYPES = ["deploy", "internal", "dev"]
+    raise ImportError("Cannot import trinity on an unsupported platform")
 
 
 def _RobustImport(moduleName, moduleNameForFallback=None):
@@ -42,13 +37,13 @@ def _RobustImport(moduleName, moduleNameForFallback=None):
     Method for importing trinity DLL, with an optional fallback if import fails
     """
     try:
-        mod = __import__(moduleName, fromlist=['*'])
+        mod = _blue.LoadExtension(moduleName)
     except ImportError as ex:
         # Try fallback module if provided
         if moduleNameForFallback:
-            print "Import failed on %s, falling back to %s ..." % (
-                moduleName, moduleNameForFallback)
-            mod = __import__(moduleNameForFallback, fromlist=['*'])
+            _logger.warn("Import failed on %s, falling back to %s ..." % (
+                moduleName, moduleNameForFallback))
+            mod = _blue.LoadExtension(moduleNameForFallback)
         else:
             _utils.Quit("Failed to import %s (%r)" % (moduleName, repr(ex)))
 
@@ -62,7 +57,6 @@ def _ImportDll():
     Returns the platform selected.
     """
     triPlatform = _os.getenv("TRINITYPLATFORM", DEFAULT_TRI_PLATFORM)
-    triType = _os.getenv("TRINITYTYPE", DEFAULT_TRI_TYPE)
     disablePlatformCheck = _os.getenv("TRINITYNOPLATFORMCHECK")
 
     for arg in _blue.pyos.GetArg():
@@ -72,16 +66,8 @@ def _ImportDll():
             s = arg.split("=")
             triPlatform = s[1]
 
-        elif arg.startswith("/tritype"):
-            s = arg.split("=")
-            triType = s[1]
-
         elif arg == "/no-platform-check":
             disablePlatformCheck = True
-
-    if triType not in VALID_TRI_TYPES:
-        import log
-        log.Quit("Invalid Trinity dll type")
 
     if not disablePlatformCheck:
         if triPlatform.startswith("dx"):
@@ -95,15 +81,9 @@ def _ImportDll():
     else:
         _logger.info("Skipping platform check")
 
-    dllName = "_trinity_%s_%s" % (triPlatform, triType)
-    print "Starting up Trinity through %s ..." % dllName
+    dllName = "_trinity_%s" % triPlatform
+    _logger.debug("Starting up Trinity through %s ..." % dllName)
     _RobustImport(dllName)
-
-    if hasattr(_blue, "memoryTracker") and hasattr(_blue.memoryTracker, "d3dHeap1"):
-        if GetD3DCreatedHeapCount() > 0:
-            _blue.memoryTracker.d3dHeap1 = GetD3DCreatedHeap(0)
-        if GetD3DCreatedHeapCount() > 1:
-            _blue.memoryTracker.d3dHeap2 = GetD3DCreatedHeap(1)
 
     return triPlatform
 

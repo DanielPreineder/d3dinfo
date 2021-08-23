@@ -11,18 +11,7 @@ not an ImportError, because we want it to be more severe.
 """
 
 import logging
-import sys
-import pytelemetry.zoning as telemetry
-import walk
-import uthread2
-import os
-
-try:
-    import blue
-except ImportError:
-    import binbootstrapper
-    binbootstrapper.update_binaries(__file__, binbootstrapper.DLL_BLUE, binbootstrapper.DLL_TRINITY)
-    import blue
+import blue
 
 import _utils
 
@@ -255,7 +244,8 @@ def CreatePythonBinding(cs, src, srcAttr, dst, dstAttr):
 def IsMsaaTypeSupported(msaa_type, formats):
     supported = True
     for surface_format in formats:
-        args = device.adapter, surface_format[0], app.windowed, msaa_type
+        windowed = app.GetWindowState().windowMode != _trinity.Tr2WindowMode.FULL_SCREEN
+        args = device.adapter, surface_format[0], windowed, msaa_type
         try:
             if surface_format[1]:
                 quality_levels = adapters.GetRenderTargetMsaaSupport(*args)

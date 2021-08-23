@@ -38,7 +38,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     # the render steps, by looking for the prior or next step that exists, in order to position the new one
     # See: AddStep
     renderStepOrder = [
-        "PRESENT_SWAPCHAIN",
         "SET_SWAPCHAIN_RT",
         "SET_SWAPCHAIN_DEPTH",
         "SET_UPDATE_VIEW",
@@ -76,7 +75,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         "SET_PERFRAME_DATA",
         "RJ_POSTPROCESSING",
         "FINAL_BLIT",
-        "FPS_COUNTER"
+        "FPS_COUNTER",
+        "RESET_SWAPCHAIN_DEPTH",
+        "RESET_SWAPCHAIN_RT",
+        "PRESENT_SWAPCHAIN",
     ]
 
     # This is a template for creating quad and multi-view renderjobs
@@ -397,7 +399,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         return trinity.TriStepRunJob(job)
 
     def _GetRTForDepthPass(self):
-        return self.GetBackBufferRenderTarget()
+        return trinity.Tr2RenderTarget(self.depthTexture.width, self.depthTexture.height, 1,
+                                       trinity.PIXEL_FORMAT.B8G8R8A8_UNORM, self.depthTexture.multiSampleType,
+                                       self.depthTexture.multiSampleQuality)
 
     def _CreateDepthPass(self):
         rj = trinity.TriRenderJob()
@@ -894,11 +898,15 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.RemoveStep("SET_DEPTH")
 
         if self.GetSwapChain() is not None:
-            self.AddStep("SET_SWAPCHAIN_RT", trinity.TriStepSetRenderTarget(self.GetSwapChain().backBuffer))
-            self.AddStep("SET_SWAPCHAIN_DEPTH", trinity.TriStepSetDepthStencil(self.GetSwapChain().depthStencilBuffer))
+            self.AddStep("SET_SWAPCHAIN_RT", trinity.TriStepPushRenderTarget(self.GetSwapChain().backBuffer))
+            self.AddStep("RESET_SWAPCHAIN_RT", trinity.TriStepPopRenderTarget())
+            self.AddStep("SET_SWAPCHAIN_DEPTH", trinity.TriStepPushDepthStencil(self.GetSwapChain().depthStencilBuffer))
+            self.AddStep("RESET_SWAPCHAIN_DEPTH", trinity.TriStepPopDepthStencil())
         else:
             self.RemoveStep("SET_SWAPCHAIN_RT")
+            self.RemoveStep("RESET_SWAPCHAIN_RT")
             self.RemoveStep("SET_SWAPCHAIN_DEPTH")
+            self.RemoveStep("RESET_SWAPCHAIN_DEPTH")
 
         if customBackBuffer is not None:
             self.AddStep("SET_CUSTOM_RT", trinity.TriStepPushRenderTarget(customBackBuffer))

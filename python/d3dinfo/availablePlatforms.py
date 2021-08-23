@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    import d3dinfo
+    d3dinfo = blue.LoadExtension("_d3dinfo")
 except ImportError:
     d3dinfo = None
 
@@ -79,24 +79,17 @@ def GetAvailablePlatforms():
     """
     platforms = []
 
-    if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
-        platforms.append("gles2")
-        platforms.append("gl4")
+    if sys.platform.startswith("darwin"):
+        platforms.append("metal")
     else:
         if IsD3D9Valid():
             platforms.append("dx9")
-
         if IsD3D11Valid():
             platforms.append("dx11")
-
         if IsD3D12Valid():
             platforms.append("dx12")
 
-        if not blue.pyos.packaged:
-            platforms.append("gles2")
-            platforms.append("gl4")
-
-        platforms.append("stub")
+    platforms.append("stub")
 
     return platforms
 

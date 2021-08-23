@@ -1,12 +1,8 @@
-import os
-import sys
-
+import blue
+import trinity
+import uthread2
 
 def crash(done=None):
-    import blue
-    import trinity
-    import uthread2
-
     rj = trinity.CreateRenderJob('Crash')
     rj.steps.append(trinity.TriStepRunComputeShader())
     rj.steps[0].effect = trinity.Tr2Effect()
@@ -20,15 +16,9 @@ def crash(done=None):
 
 
 def _main():
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-    import binbootstrapper
-    binbootstrapper.update_binaries('.', *binbootstrapper.DLLS_GRAPHICS)
-
-    from binbootstrapper.trinityapp import TrinityApp
+    from trinity.trinityapp import TrinityApp
     app = TrinityApp()
 
-    import uthread2
     done = [False]
     uthread2.start_tasklet(crash, done)
     while not done[0]:

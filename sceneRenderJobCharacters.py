@@ -323,7 +323,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             if self.supersampling:
                 self.AddStep("PUSH_RENDER_SCALE_RT", trinity.TriStepPushRenderTarget(self.customBackBuffer2))
                 self.AddStep("PUSH_RENDER_SCALE_DS", trinity.TriStepPushDepthStencil(None))
-                self.AddStep("CLEAR_BB2", trinity.TriStepClear((0.0, 0.0, 0.0, 0.0), 1.0))
+                self.AddStep("CLEAR_BB2", trinity.TriStepClear((0.0, 0.0, 0.0, 0.0)))
                 self.SetStepAttr("CLEAR_BB2", "isColorCleared", True)
                 self.AddStep("SET_SCALE_VP", trinity.TriStepSetViewport(self.local_scale_vp_obj))
                 self.rs_effect = self.CreateRenderScaleEffect(self.customBackBuffer)
@@ -346,7 +346,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             self.AddStep("POP_RENDER_BLEND_RT", trinity.TriStepPopRenderTarget())
             self.AddStep("POP_RENDER_BLEND_DS", trinity.TriStepPopDepthStencil())
             self.setupPostProcess()
-            self.AddStep("CLEAR_TRANSOUTPUT", trinity.TriStepClear((0.0, 0.0, 0.0, 0.0), 1.0))
+            self.AddStep("CLEAR_TRANSOUTPUT", trinity.TriStepClear((0.0, 0.0, 0.0, 0.0)))
             self.SetStepAttr("CLEAR_TRANSOUTPUT", "isColorCleared", True)
             self.AddStep("PUSH_TRANS_RT", trinity.TriStepPushRenderTarget(self.transOutput))
             self.AddStep("PUSH_TRANS_DS", trinity.TriStepPushDepthStencil(None))

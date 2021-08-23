@@ -105,10 +105,12 @@ class SceneRenderJobSpaceJessica(SceneRenderJobSpace):
         SceneRenderJobSpace.SetRenderTargets(self, *args)
 
         if self.depthBufferOverride:
-            self.AddStep("SET_SWAPCHAIN_DEPTH", trinity.TriStepSetDepthStencil(self.depthBufferOverride))
+            self.AddStep("SET_SWAPCHAIN_DEPTH", trinity.TriStepPushDepthStencil(self.depthBufferOverride))
+            self.AddStep("RESET_SWAPCHAIN_DEPTH", trinity.TriStepPopDepthStencil())
 
         if self.backBufferOverride:
-            self.AddStep("SET_SWAPCHAIN_RT", trinity.TriStepSetRenderTarget(self.backBufferOverride))
+            self.AddStep("SET_SWAPCHAIN_RT", trinity.TriStepPushRenderTarget(self.backBufferOverride))
+            self.AddStep("RESET_SWAPCHAIN_RT", trinity.TriStepPopRenderTarget())
 
     def GetBackBufferSize(self):
         """

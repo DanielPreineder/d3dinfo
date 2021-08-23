@@ -16,8 +16,9 @@ adapters = _trinity._blue.classes.CreateInstance("trinity.Tr2VideoAdapters")
 """:type: trinity.Tr2VideoAdapters"""
 device = _trinity._blue.classes.CreateInstance("trinity.TriDevice")
 """:type: trinity.TriDevice"""
-app = _trinity._blue.classes.CreateInstance("triui.App")
-""":type: trinity.App"""
+mainWindow = _trinity._blue.classes.CreateInstance("trinity.Tr2MainWindow")
+""":type: trinity.Tr2MainWindow"""
+app = mainWindow
 platformInfo = _trinity._blue.classes.CreateInstance("trinity.Tr2PlatformInfo")
 """:type: trinity.Tr2PlatformInfo"""
 

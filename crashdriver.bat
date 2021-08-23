@@ -1,1 +1,1 @@
-..\..\..\..\..\shared_tools\python\27\python crashdriver.py
+..\..\eve\client\pythonInterpreter.bat crashdriver.py
