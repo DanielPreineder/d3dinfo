@@ -62,6 +62,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         "RENDER_SCALE",
         "POP_RENDER_SCALE_RT",
         "POP_RENDER_SCALE_DS",
+        "RESOLVE_FOR_POST",
         "PUSH_TRANS_RT",
         "PUSH_TRANS_DS",
         "CLEAR_TRANSOUTPUT",
@@ -182,6 +183,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         self.customDepthStencil = None
         self.resolveBuffer = None
         self.lut_res_path = "res:/dx9/scene/postprocess/NCC_normal.dds"
+        self.postBackBuffer = None
         self.postProcess = None
         self.startOpacity = 1.0
         self.dx9_active = trinity.platform == "dx9"
@@ -232,6 +234,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         self.customDepthStencil = None
         self.resolveBuffer = None
         self.bgBuffer = None
+        self.postBackBuffer = None
 
 
     def DoPrepareResources(self):
@@ -339,6 +342,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
                     self.customBackBuffer2 = rtm.GetRenderTargetAL(width, height, 1, bbFormat, index=4)
                 else:
                     self.customBackBuffer = rtm.GetRenderTargetMsaaAL(width, height, bbFormat, msaaType, 0, index=3)
+                    self.postBackBuffer = rtm.GetRenderTargetAL(width, height, 1, bbFormat, index=6)
             self.AddStep("SET_BACKBUFFER", trinity.TriStepPushRenderTarget(self.customBackBuffer))
             self.AddStep("SET_BG_LAYER", trinity.TriStepCopyRenderTarget(self.bgBuffer, self.GetBackBufferRenderTarget(), self.cropped_local_vp_obj, self.cropped_scr_vp_obj))
             if msaaType <= 1:
@@ -376,8 +380,10 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
             self.AddStep("PUSH_TRANS_DS", trinity.TriStepPushDepthStencil(None))
             if self.supersampling:
                 self.AddStep("RENDER_TRANSMISSION", trinity.TriStepRenderEffect(self.CreateTransmissionEffect(self.customBackBuffer2)))
+                self.RemoveStep("RESOLVE_FOR_POST")
             else:
-                self.AddStep("RENDER_TRANSMISSION", trinity.TriStepRenderEffect(self.CreateTransmissionEffect(self.customBackBuffer)))
+                self.AddStep("RESOLVE_FOR_POST", trinity.TriStepResolve(self.postBackBuffer, self.customBackBuffer))
+                self.AddStep("RENDER_TRANSMISSION", trinity.TriStepRenderEffect(self.CreateTransmissionEffect(self.postBackBuffer)))
             self.AddStep("POP_TRANS_RT", trinity.TriStepPopRenderTarget())
             self.AddStep("POP_TRANS_DS", trinity.TriStepPopDepthStencil())
             self.AddStep("RESTORE_BACKBUFFER", trinity.TriStepPopRenderTarget())
