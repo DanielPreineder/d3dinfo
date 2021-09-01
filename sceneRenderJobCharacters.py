@@ -69,6 +69,10 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         "POP_TRANS_RT",
         "POP_TRANS_DS",
         "RESOLVE_IMAGE",
+
+        "SET_COPY_TO_BB_STATE",
+        "COPY_TO_BB",
+
         "SET_BLENDSOURCE",
         "PUSH_RENDER_BLEND_RT",
         "PUSH_RENDER_BLEND_DS",
@@ -188,6 +192,21 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         self.supersampling = False
         self.aaQuality = gfxsettings.AA_QUALITY_MSAA_MEDIUM
 
+        # There is a bug in Intel drivers for macOS 10.x (at least, possibly 11 as well) that prevents rendering into
+        # a render target after it was a destination of MSAA resolve. As a workaround we resolve into a temp render
+        # target and then blit it to the back buffer
+        self._needsIntelWorkaround = False
+        self._DetectIntelOnMacOS()
+
+    def _DetectIntelOnMacOS(self):
+        self._needsIntelWorkaround = False
+        if trinity.platform == "metal":
+            try:
+                info = trinity.adapters.GetAdapterInfo(trinity.mainWindow.GetWindowState().adapter)
+                self._needsIntelWorkaround = info.vendorID == 32902
+            except:
+                pass
+
     def _SetScene(self, scene):
         """
         Sets a scene into the render job
@@ -220,6 +239,7 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         This function is called when the device is restored. 
         This function may raise exceptions attempting to create resources!
         """
+        self._DetectIntelOnMacOS()
         self.SetSettingsBasedOnPerformancePreferences()
 
     def GetMSAAType(self):
@@ -295,12 +315,16 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
         dsFormat = trinity.DEPTH_STENCIL_FORMAT.D24S8
 
         self.customBackBuffer = None
+        self.resolveBuffer = None
         if self.supersampling:
             self.customDepthStencil = rtm.GetDepthStencilAL(width * AA_SCALE_FACTOR, height * AA_SCALE_FACTOR, dsFormat, 1)
         else:
             self.customDepthStencil = rtm.GetDepthStencilAL(width, height, dsFormat, msaaType)
         self.AddStep("SET_DEPTH_STENCIL", trinity.TriStepPushDepthStencil(self.customDepthStencil))
         self.AddStep("RESTORE_DEPTH_STENCIL", trinity.TriStepPopDepthStencil())
+
+        self.RemoveStep("SET_COPY_TO_BB_STATE")
+        self.RemoveStep("COPY_TO_BB")
 
         if viewport:
             self.bgBuffer = rtm.GetRenderTargetAL(width, height, 1, bbFormat, index=2)
@@ -366,7 +390,15 @@ class SceneRenderJobCharacters(SceneRenderJobBase):
                 self.customBackBuffer = rtm.GetRenderTargetMsaaAL(width, height, bbFormat, msaaType, 0)
                 self.AddStep("SET_BACKBUFFER", trinity.TriStepPushRenderTarget(self.customBackBuffer))
                 self.AddStep("RESTORE_BACKBUFFER", trinity.TriStepPopRenderTarget())
-                self.AddStep("RESOLVE_IMAGE", trinity.TriStepResolve(self.GetBackBufferRenderTarget(), self.customBackBuffer))
+
+                if self._needsIntelWorkaround:
+                    self.resolveBuffer = rtm.GetRenderTargetAL(width, height, 1, bbFormat, 6)
+                    self.AddStep("RESOLVE_IMAGE", trinity.TriStepResolve(self.resolveBuffer, self.customBackBuffer))
+
+                    self.AddStep("SET_COPY_TO_BB_STATE", trinity.TriStepSetStdRndStates(trinity.RM_FULLSCREEN))
+                    self.AddStep("COPY_TO_BB", trinity.TriStepRenderTexture(self.resolveBuffer))
+                else:
+                    self.AddStep("RESOLVE_IMAGE", trinity.TriStepResolve(self.GetBackBufferRenderTarget(), self.customBackBuffer))
 
             self.enabled = True
 
