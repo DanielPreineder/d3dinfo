@@ -575,6 +575,18 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         except gfxsettings.UninitializedSettingsGroupError:
             currentSettings["gpuParticles"] = gfxsettings.GetDefault(gfxsettings.UI_GPU_PARTICLES_ENABLED)
 
+        # Intel "GPU" drivers on macOS 10.14 can't handle draw indirect calls, so we have to disable particle systems
+        # for them.
+        if blue.sysinfo.os.platform == blue.OsPlatform.OSX and blue.sysinfo.os.majorVersion == 10 and blue.sysinfo.os.minorVersion <= 14:
+            vendorID = 0
+            try:
+                vendorID = _singletons.adapters.GetAdapterInfo(_singletons.device.adapter).vendorID
+            except (AttributeError, trinity.ALError):
+                pass
+            if vendorID == 32902:
+                logger.warn('Disabling GPU particles because of issues with Intel GPUs on macOS 10.14')
+                currentSettings["gpuParticles"] = False
+
         return currentSettings
 
     def ApplyBaseSettings(self):
