@@ -267,8 +267,4 @@ def _init():
     _StoreGPUInfoInCrashHeaders()
     device.SetRenderJobs(renderJobs)
 
-    # Create a job that calculates and displays the frames per second.
-    if not blue.pyos.packaged:
-        SetFpsEnabled(True)
-
 _init()
