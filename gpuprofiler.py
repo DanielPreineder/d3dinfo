@@ -39,7 +39,7 @@ class RawZone(object):
         """
         A simple wrapper for tuples returned by Tr2Profiler.GetFrameReport
         :param data: a tuple returned by Tr2Profiler.GetFrameReport
-        :type data: (None|blue.IRoot, str, dict, tuple)
+        :type data: (None|blue.IRoot, str, dict, list)
         """
         self.owner = data[Tr2GpuProfilerIndexes.OWNER]
         self.message = data[Tr2GpuProfilerIndexes.MESSAGE]
