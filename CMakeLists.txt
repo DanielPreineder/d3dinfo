@@ -7,8 +7,6 @@ endif()
 add_library(d3dinfo SHARED
     AdapterInfo.h
     AdapterInfo.cpp
-    d3d9info.h
-    d3d9info.cpp
     D3D11Info.h
     D3D11Info.cpp
     D3D12Info.h

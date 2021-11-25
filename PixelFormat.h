@@ -119,10 +119,7 @@ enum PixelFormat
 
 extern const Be::VarChooser PixelFormat_Chooser[];
 
-PixelFormat ConvertFromD3D9Format( D3DFORMAT format );
-D3DFORMAT ConvertToD3D9Format( PixelFormat format );
-
-PixelFormat ConvertFromDxgiFormat( D3DFORMAT format );
+PixelFormat ConvertFromDxgiFormat( DXGI_FORMAT format );
 DXGI_FORMAT ConvertToDxgiFormat( PixelFormat format );
 
 #endif // PixelFormat_h
