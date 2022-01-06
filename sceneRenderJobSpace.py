@@ -54,6 +54,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         "UPDATE_BRACKETS",
         "CLEAR",
         "BEGIN_RENDER",
+        "RENDER_REFLECTIONS",
         "RENDER_BACKGROUND",
         "DO_BACKGROUND_DISTORTIONS",
         "RENDER_DEPTH_PASS",
@@ -146,6 +147,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.useImpostors = True
 
         self.useReflectionProbe = True
+
+        self.reflectionSetting = gfxsettings.GFX_REFLECTION_QUALITY_LOW # default to low
 
     def Enable(self, schedule=True):
         SceneRenderJobBase.Enable(self, schedule)
@@ -413,6 +416,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.SetStepAttr("SET_PERFRAME_DATA", 'scene', scene)
         self.SetStepAttr("RENDER_3D_UI", 'scene', scene)
         self.SetStepAttr("RENDER_BACKGROUND", 'scene', scene)
+        self.SetStepAttr("RENDER_REFLECTIONS", 'scene', scene)
         self.SetStepAttr("DO_BACKGROUND_DISTORTIONS", 'predicate', scene)
         self.SetStepAttr("DO_DISTORTIONS", 'predicate', scene)
         self._CreateDepthPass()
@@ -435,6 +439,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.AddStep("SET_VIEWPORT", trinity.TriStepSetViewport())
         self.AddStep("BEGIN_RENDER", trinity.TriStepRenderPass(scene, trinity.TRIPASS_BEGIN_RENDER))
         self.AddStep("END_RENDERING", trinity.TriStepRenderPass(scene, trinity.TRIPASS_END_RENDER))
+        self.AddStep("RENDER_REFLECTIONS", trinity.TriStepRenderPass(scene, trinity.TRIPASS_REFLECTION_RENDER))
         self.AddStep("RENDER_MAIN_PASS", trinity.TriStepRenderPass(scene, trinity.TRIPASS_MAIN_RENDER))
         self.AddStep("SET_PERFRAME_DATA", trinity.TriStepRenderPass(scene, trinity.TRIPASS_SET_PERFRAME_DATA))
         self.AddStep("RENDER_3D_UI", trinity.TriStepRenderPass(scene, trinity.TRIPASS_RENDER_UI))
@@ -501,6 +506,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         except gfxsettings.UninitializedSettingsGroupError:
             currentSettings["gpuParticles"] = gfxsettings.GetDefault(gfxsettings.UI_GPU_PARTICLES_ENABLED)
 
+        currentSettings["reflections"] = gfxsettings.Get(gfxsettings.GFX_REFLECTION_QUALITY)
+
         # Intel "GPU" drivers on macOS 10.14 can't handle draw indirect calls, so we have to disable particle systems
         # for them.
         if blue.sysinfo.os.platform == blue.OsPlatform.OSX and blue.sysinfo.os.majorVersion == 10 and blue.sysinfo.os.minorVersion <= 14:
@@ -535,6 +542,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.bbFormat = self.overrideSettings["bbFormat"]
         if "aaQuality" in self.overrideSettings:
             self.aaQuality = self.overrideSettings["aaQuality"]
+
+        self.reflectionSetting = currentSettings["reflections"]
 
     def OverrideSettings(self, key, value):
         self.overrideSettings[key] = value
@@ -747,11 +756,6 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self._SetSecondaryLighting()
         trinity.settings.SetValue('eveSpaceSceneDynamicLighting', trinity.GetShaderModel().endswith("DEPTH"))
 
-        try:
-            isHighQuality = gfxsettings.Get(gfxsettings.GFX_SHADER_QUALITY) == gfxsettings.SHADER_MODEL_HIGH
-        except gfxsettings.UninitializedSettingsGroupError:
-            isHighQuality = True
-
         scene = self.GetScene()
         if scene is None:
             return
@@ -767,7 +771,23 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         else:
             scene.msaaSamples = 1
 
-        scene.reflectionProbe = trinity.Tr2ReflectionProbe() if self.useReflectionProbe and isHighQuality else None
+        self.SetReflectionBasedOnSettings()
+
+    def SetReflectionBasedOnSettings(self):
+        scene = self.GetScene()
+
+        reflectionsEnabled = self.reflectionSetting != gfxsettings.GFX_REFLECTION_QUALITY_OFF and trinity.GetShaderModel() != 'SM_3_0_LO'
+        if reflectionsEnabled:
+            scene.reflectionProbe = trinity.Tr2ReflectionProbe()
+            self.EnableStep("RENDER_REFLECTIONS")
+        else:
+            scene.reflectionProbe = None
+            self.DisableStep("RENDER_REFLECTIONS")
+
+        trinity.settings.SetValue('eveReflectionSetting', self.reflectionSetting)
+
+        if hasattr(scene, "ReregisterEntities"):
+            scene.ReregisterEntities()
 
     def _RefreshRenderTargets(self):
         """

@@ -31,7 +31,8 @@ class SceneRenderJobSpaceJessica(SceneRenderJobSpace):
             "postProcessingQuality": 2,
             "shadowQuality": 2,
             "shadowMapSize": 1024,
-            "taa": False
+            "taa": False,
+            "reflections": 3
         }
         self.backBufferOverride = None
         self.depthBufferOverride = None
