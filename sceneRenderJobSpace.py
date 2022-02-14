@@ -775,7 +775,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
     def SetReflectionBasedOnSettings(self):
         scene = self.GetScene()
-        reflectionsEnabled = gfxsettings.Get(gfxsettings.GFX_SHADER_QUALITY) != gfxsettings.SHADER_MODEL_LOW
+        reflectionsEnabled = trinity.GetShaderModel() != 'SM_2_0_LO'
 
         if reflectionsEnabled:
             scene.reflectionProbe = trinity.Tr2ReflectionProbe()
