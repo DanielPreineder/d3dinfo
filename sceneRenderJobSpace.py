@@ -775,16 +775,22 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
     def SetReflectionBasedOnSettings(self):
         scene = self.GetScene()
+        reflectionsEnabled = gfxsettings.Get(gfxsettings.GFX_SHADER_QUALITY) != gfxsettings.SHADER_MODEL_LOW
 
-        reflectionsEnabled = self.reflectionSetting != gfxsettings.GFX_REFLECTION_QUALITY_OFF and trinity.GetShaderModel() != 'SM_3_0_LO'
         if reflectionsEnabled:
             scene.reflectionProbe = trinity.Tr2ReflectionProbe()
+            if self.reflectionSetting == gfxsettings.GFX_REFLECTION_QUALITY_HIGHEST:
+                scene.reflectionProbe.renderFrequency = trinity.ReflectionProbeRenderFrequency.AllSidesPerFrame
+            else:
+                scene.reflectionProbe.renderFrequency = trinity.ReflectionProbeRenderFrequency.OneSidePerFrame
+
+            trinity.settings.SetValue('eveReflectionSetting', self.reflectionSetting)
             self.EnableStep("RENDER_REFLECTIONS")
         else:
             scene.reflectionProbe = None
+            trinity.settings.SetValue('eveReflectionSetting', gfxsettings.GFX_REFLECTION_QUALITY_OFF)
             self.DisableStep("RENDER_REFLECTIONS")
 
-        trinity.settings.SetValue('eveReflectionSetting', self.reflectionSetting)
 
         if hasattr(scene, "ReregisterEntities"):
             scene.ReregisterEntities()

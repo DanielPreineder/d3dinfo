@@ -6,6 +6,7 @@ Contains a jessica version of the space scene render job.
 from . import _trinity as trinity
 from . import _singletons
 from .sceneRenderJobSpace import SceneRenderJobSpace
+import evegraphics.settings as gfxsettings
 
 
 def CreateJessicaSpaceRenderJob(name=None):
@@ -32,7 +33,7 @@ class SceneRenderJobSpaceJessica(SceneRenderJobSpace):
             "shadowQuality": 2,
             "shadowMapSize": 1024,
             "taa": False,
-            "reflections": 3
+            "reflections": gfxsettings.GFX_REFLECTION_QUALITY_HIGHEST
         }
         self.backBufferOverride = None
         self.depthBufferOverride = None
