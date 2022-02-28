@@ -795,6 +795,19 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if hasattr(scene, "ReregisterEntities"):
             scene.ReregisterEntities()
 
+    def UpdateFinalBlitStep(self):
+        """
+        Recreate the final blit step to get rid of any
+        lingering effects of old postprocessing jobs.
+        """
+        oldStep = self.GetStep("FINAL_BLIT")
+        if oldStep is not None and isinstance(oldStep, trinity.TriStepRenderPostProcess):
+            newStep = trinity.TriStepRenderPostProcess(
+                oldStep.scene,
+                oldStep.renderTarget
+            )
+            self.AddStep("FINAL_BLIT", newStep)
+
     def _RefreshRenderTargets(self):
         """
         Set the required buffers on all the the renderjob steps.
