@@ -130,7 +130,7 @@ def GetParticleElementAnnotations(effect, cache=None):
 
     resPath = effect.effectFilePath.lower().replace('\\', '/')
     if cache is not None and (resPath, frozen, 'GetParticleElementAnnotations') in cache:
-        return set(cache[(resPath, frozen, 'GetParticleElementAnnotations')])
+        return cache[(resPath, frozen, 'GetParticleElementAnnotations')]
 
     def inner(shader):
         """
