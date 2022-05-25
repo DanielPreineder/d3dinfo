@@ -31,9 +31,9 @@ from . import GraphManager
 graphs = GraphManager.GraphManager()
 
 
-def _ReportRemovedDevice(hr, message, count, marker, pageFaultResource):
+def _ReportRemovedDevice(hr, message, count, marker, pageFaultResource, crashInfo):
     logging.error('GPU device removed',
                   extra={"count": count, "error_message": message, "pageFaultResource": pageFaultResource,
-                         "tags": {"reason": '0x%x' % hr, "marker": marker}})
+                         "tags": {"reason": '0x%x' % hr, "marker": marker}, "crashInfo": crashInfo})
 
 device.onDeviceRemoved = _ReportRemovedDevice
