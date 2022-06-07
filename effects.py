@@ -173,9 +173,9 @@ def GetUnusedParameters(effect, cache=None):
     return result
 
 
-def GetMissingParameters(effect, cache=None):
+def GetMissingResources(effect, cache=None):
     """
-    Returns a list of parameter names that are missing from the effect
+    Returns a list of resources names that are missing from the effect
 
     :param effect: effect object
     :type effect: trinity.Tr2Effect
@@ -184,12 +184,10 @@ def GetMissingParameters(effect, cache=None):
     :rtype: list[str]
     """
     path = blue.paths.ResolvePath(effect.effectFilePath)
-    params, resources, _ = _GetMergedParameters(path, effect.options, cache)
-    params.update(resources)
-    existing = {name for name, _ in effect.constParameters}
-    existing.update((p.name for p in effect.parameters))
-    existing.update((p.name for p in effect.resources))
-    return list(set(params.keys()).difference(existing))
+    _, resources, __ = _GetMergedParameters(path, effect.options, cache)
+
+    existing = {p.name for p in effect.resources}
+    return list(set(resources).difference(existing))
 
 
 def IsParameterUsed(effect, name, cache=None):
