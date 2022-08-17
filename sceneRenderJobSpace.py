@@ -13,6 +13,9 @@ DEFAULT_POSTPROCESS_PATH = 'res:/dx9/postprocess/DefaultPostProcessingSettings.r
 
 logger = logging.getLogger(__name__)
 
+# This is a temporary hack for SSAO setting before we decide if we are tying it with any other graphics setting
+SSAOSetting = 0
+
 
 def CreateSceneRenderJobSpace(name=None):
     """
@@ -98,6 +101,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         # All the surfaces needed for different settings
         self.customBackBuffer = None
         self.customDepthStencil = None
+        self.normalTexture = None
         self.blitTexture = None
         self.distortionTexture = None
         self.velocityTexture = None
@@ -282,6 +286,16 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         if self.GetScene() is None:
             return
         setattr(self.GetScene(), "depthTexture", self.customDepthStencil)
+
+    def _SetNormalMap(self):
+        """
+        Set depth map to the scene
+        """
+        if not self.enabled:
+            return
+        if self.GetScene() is None:
+            return
+        setattr(self.GetScene(), "normalTexture", self.normalTexture)
 
     def _SetDistortionMap(self):
         """
@@ -613,6 +627,23 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         elif not useBlitTexture:
             self.blitTexture = None
 
+        # normalTexture
+        if SSAOSetting == 0 or trinity.GetShaderModel() == 'SM_3_0_LO':
+            needNormalMap = False
+        else:
+            needNormalMap = True
+        if needNormalMap:
+            if self._TargetDiffers(self.normalTexture, "trinity.Tr2RenderTarget", trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT, msaaType, width, height):
+                if self.msaaEnabled:
+                    self.normalTexture = rtm.GetRenderTargetMsaaAL(width, height, trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT, msaaType, 0, 1)
+                else:
+                    self.normalTexture = rtm.GetRenderTargetAL(width, height, 1, trinity.PIXEL_FORMAT.R16G16B16A16_FLOAT, 1)
+                if self.normalTexture:
+                    self.normalTexture.name = 'sceneRenderJobSpace.normalTexture'
+        else:
+            self.normalTexture = None
+        self._SetNormalMap()
+
         # distortionTexture
         if self.distortionEffectsEnabled:
             index = 0
@@ -765,6 +796,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     def ApplyPerformancePreferencesToScene(self):
         self._SetShadowMap()
         self._SetDepthMap()
+        self._SetNormalMap()
         self._SetDistortionMap()
         self._SetVelocityMap()
         self._SetSecondaryLighting()
@@ -786,6 +818,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             scene.msaaSamples = 1
 
         self.SetReflectionBasedOnSettings()
+        self.SetSSAOBasedOnSettings()
 
     def SetReflectionBasedOnSettings(self):
         scene = self.GetScene()
@@ -806,6 +839,20 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         if hasattr(scene, "ReregisterEntities"):
             scene.ReregisterEntities()
+
+    def SetSSAOBasedOnSettings(self):
+        scene = self.GetScene()
+
+        if SSAOSetting == 0 or trinity.GetShaderModel() == 'SM_3_0_LO':
+            scene.SSAO.enabled = False
+        elif SSAOSetting == 1:
+            scene.SSAO.enabled = True
+            scene.SSAO.quality = trinity.SSAOQuality.Lowest
+            scene.SSAO.useDownsampledSSAO = True
+        else:
+            scene.SSAO.enabled = True
+            scene.SSAO.quality = trinity.SSAOQuality.Highest
+            scene.SSAO.useDownsampledSSAO = False
 
     def UpdateFinalBlitStep(self):
         """
@@ -861,6 +908,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.AddStep("SET_DEPTH", trinity.TriStepPushDepthStencil(self.customDepthStencil))
         self.AddStep("RESTORE_DEPTH", trinity.TriStepPopDepthStencil())
         self._SetDepthMap()
+        self._SetNormalMap()
         if self.customDepthStencil and self.customDepthStencil.multiSampleType > 1:
             self.AddStep("SET_VAR_DEPTH", trinity.TriStepSetVariableStore("DepthMap", trinity.TriTextureRes()))
             self.AddStep("SET_VAR_DEPTH_MSAA", trinity.TriStepSetVariableStore("DepthMapMsaa", self.customDepthStencil))
