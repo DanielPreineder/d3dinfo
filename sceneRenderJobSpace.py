@@ -70,9 +70,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         "RENDER_INFO",
         "RENDER_VISUAL",
         "RENDER_TOOLS",
+        "SET_PERFRAME_DATA",
         "SET_FINAL_RT",
         "RESTORE_DEPTH",
-        "SET_PERFRAME_DATA",
         "RJ_POSTPROCESSING",
         "FINAL_BLIT",
         "FPS_COUNTER",
@@ -126,6 +126,8 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.secondaryLighting = False
 
         self.postProcessingQuality = 0
+
+        self.fsrMode = gfxsettings.GFX_FSR_MODE_OFF
 
         self.bbFormat = _singletons.device.GetRenderContext().GetBackBufferFormat()
 
@@ -524,6 +526,12 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         else:
             currentSettings['ao'] = gfxsettings.Get(gfxsettings.GFX_AO_QUALITY)
 
+        currentSettings["fsr"] = gfxsettings.Get(gfxsettings.GFX_FSR_MODE)
+
+        if gfxsettings.GetPendingOrCurrent(gfxsettings.GFX_ANTI_ALIASING) == gfxsettings.AA_QUALITY_DISABLED:
+            # turn it off if we have no aa
+            currentSettings["fsr"] = gfxsettings.GFX_FSR_MODE_OFF
+
         self._GetRefectionSettings(currentSettings)
 
         # Intel "GPU" drivers on macOS 10.14 can't handle draw indirect calls, so we have to disable particle systems
@@ -561,6 +569,7 @@ class SceneRenderJobSpace(SceneRenderJobBase):
         self.aaQuality = currentSettings["aaQuality"]
         self.hdrEnabled = self.postProcessingQuality > 0
         self.gpuParticlesEnabled = currentSettings.get("gpuParticles", True)
+        self.fsrMode = currentSettings["fsr"]
 
         isDepth = trinity.GetShaderModel().endswith("DEPTH")
         self.secondaryLighting = self.distortionEffectsEnabled = isDepth
@@ -588,6 +597,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
     def _CreateRenderTargets(self):
         if not self.prepared:
             return
+
+        # fsr will have an effect on the width/height of the rendertargets
+        self._RefreshFSR()
 
         width, height = self.GetBackBufferSize()
 
@@ -946,6 +958,19 @@ class SceneRenderJobSpace(SceneRenderJobBase):
             self.RemoveStep("DO_DISTORTIONS")
 
         self._CreateDepthPass()
+
+    def _RefreshFSR(self):
+        self.invBackBufferScale = 1.0
+        # we need to know if we are using upsampling via FSR
+        if self.GetScene():
+            postprocess = self.GetScene().postprocess
+            if not postprocess:
+                postprocess = trinity.Tr2PostProcess2()
+            ffx = getattr(postprocess, "fidelityFX", trinity.Tr2PPFidelityFXEffect())
+            ffx.SetFSRQuality(self.fsrMode)
+
+            self.invBackBufferScale = 1.0 / ffx.upsamplingFactor
+            postprocess.fidelityFX = ffx
 
     def EnableSceneUpdate(self, isEnabled):
         if self.updateJob:

@@ -260,6 +260,7 @@ class SceneRenderJobBase(object):
 
         self.swapChain = None
         self.renderOrder = 0
+        self.invBackBufferScale = 1.0
 
         # Always default-initialize the name of the renderjob
         self._ManualInit(name)
@@ -407,7 +408,7 @@ class SceneRenderJobBase(object):
             width = _singletons.device.width
             height = _singletons.device.height
 
-        return width, height
+        return int(width * self.invBackBufferScale), int(height * self.invBackBufferScale)
 
     def GetBackBufferRenderTarget(self):
         """

@@ -35,6 +35,7 @@ class SceneRenderJobSpaceJessica(SceneRenderJobSpace):
             "taa": False,
             "reflections": gfxsettings.GFX_REFLECTION_QUALITY_HIGHEST,
             "ao": gfxsettings.GFX_AO_QUALITY_HIGH,
+            "fsr": gfxsettings.GFX_FSR_MODE_OFF
         }
         self.backBufferOverride = None
         self.depthBufferOverride = None
@@ -117,8 +118,7 @@ class SceneRenderJobSpaceJessica(SceneRenderJobSpace):
         
         width = self.backBufferOverride.width
         height = self.backBufferOverride.height
-
-        return width, height
+        return width * self.invBackBufferScale, height * self.invBackBufferScale
 
     def GetBackBufferRenderTarget(self):
         """
