@@ -118,7 +118,7 @@ class SceneRenderJobSpaceJessica(SceneRenderJobSpace):
         
         width = self.backBufferOverride.width
         height = self.backBufferOverride.height
-        return width * self.invBackBufferScale, height * self.invBackBufferScale
+        return int(width * self.invBackBufferScale), int(height * self.invBackBufferScale)
 
     def GetBackBufferRenderTarget(self):
         """
