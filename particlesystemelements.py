@@ -2,6 +2,7 @@ import blue
 import greatergranny
 import trinity
 from shadercompiler import effectinfo
+from . import effects
 
 
 class EffectInput(object):
@@ -137,15 +138,6 @@ def GetParticleElementAnnotations(effect, cache=None):
         :type shader: shadercompiler.effectinfo.ShaderInfo
         :return:
         """
-        for option, value in shader.options:
-            if option.type != effectinfo.Permutation.STATIC:
-                continue
-            if option.name in options:
-                if options[option.name] != value:
-                    return
-            else:
-                if option.options[option.default_index] != value:
-                    return
         for technique in shader.techniques:
             for each in technique.passes:
                 if effectinfo.Stages.VERTEX_SHADER in each.stages:
@@ -157,20 +149,23 @@ def GetParticleElementAnnotations(effect, cache=None):
                             inputs[(x.usage, x.usage_index)] = max(inputs.get((x.usage, x.usage_index), 0), x.used_mask)
 
     path = blue.paths.ResolvePath(effect.effectFilePath)
+    effectFilter = effects.GetEffectFilter(effect)
     for sm in effectinfo.SHADER_MODEL_NAMES.iterkeys():
         try:
             compiled = effectinfo.paths.get_compiled_path(path, sm, effectinfo.Platform.DX11)
         except ValueError:
             continue
         try:
-            effect = effectinfo.EffectInfo(compiled)
+            effectInfo = effectinfo.EffectInfo(compiled)
         except IOError:
             continue
         count = 1
-        for each in effect.permutations:
+        for each in effectInfo.permutations:
             count *= len(each.options)
         for each in xrange(count):
-            inner(effect.get_shader(each))
+            if not effectFilter(effectinfo.Platform.DX11, sm, effectInfo.index_to_options(each)):
+                continue
+            inner(effectInfo.get_shader(each))
 
     used = set()
     for k in inputs:

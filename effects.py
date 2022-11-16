@@ -361,6 +361,30 @@ def ValidateParameterValue(effect, name, value, cache=None):
         raise AssertionError(params[name].annotation.get('ValidationMessage', message))
 
 
+def GetEffectFilter(effect):
+    """
+    Returns a filter function to use with effectinfo to filter out shader permutations that don't apply to the
+    current effect based on option values.
+    :param effect: effect object
+    :type effect: trinity.Tr2Effect
+    """
+    options = {name: value for name, value in effect.options}
+
+    def ShaderFilter(platform, sm, permutation):
+        for option, value in permutation:
+            if option.type != effectinfo.Permutation.STATIC:
+                continue
+            if option.name in options:
+                if options[option.name] != value:
+                    return False
+            else:
+                if option.options[option.default_index] != value:
+                    return False
+        return True
+
+    return ShaderFilter
+
+
 def GetVertexShaderInputs(effect, cache=None):
     """
     Returns merged vertex shader stage inputs as (usage, usage index) pairs from all permutations of the effect
@@ -398,7 +422,7 @@ def GetVertexShaderInputs(effect, cache=None):
                     vs = each.stages[effectinfo.Stages.VERTEX_SHADER]
                     inputs.update([(x.usage, x.usage_index) for x in vs.inputs if x.used_mask])
 
-    effectinfo.apply_to_shaders(blue.paths.ResolvePath(effect.effectFilePath), inner)
+    effectinfo.apply_to_shaders(blue.paths.ResolvePath(effect.effectFilePath), inner, GetEffectFilter(effect))
     if cache is not None:
         cache[(resPath, frozen, 'GetVertexShaderInputs')] = inputs
     return inputs
