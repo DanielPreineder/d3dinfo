@@ -26,6 +26,19 @@ def CreateSceneRenderJobSpace(name=None):
     return newRJ
 
 
+def _IsIntelGPU():
+    vendorID = 0
+    try:
+        vendorID = _singletons.adapters.GetAdapterInfo(_singletons.device.adapter).vendorID
+    except (AttributeError, trinity.ALError):
+        pass
+    return vendorID == 32902
+
+
+def CanSupportSsao():
+    return blue.sysinfo.os.platform != blue.OsPlatform.OSX or not _IsIntelGPU()
+
+
 # noinspection PyAttributeOutsideInit
 class SceneRenderJobSpace(SceneRenderJobBase):
     """
@@ -532,15 +545,9 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
         # Intel "GPU" drivers on macOS 10.14 can't handle draw indirect calls, so we have to disable particle systems
         # for them.
-        if blue.sysinfo.os.platform == blue.OsPlatform.OSX and blue.sysinfo.os.majorVersion == 10 and blue.sysinfo.os.minorVersion <= 14:
-            vendorID = 0
-            try:
-                vendorID = _singletons.adapters.GetAdapterInfo(_singletons.device.adapter).vendorID
-            except (AttributeError, trinity.ALError):
-                pass
-            if vendorID == 32902:
-                logger.warn('Disabling GPU particles because of issues with Intel GPUs on macOS 10.14')
-                currentSettings["gpuParticles"] = False
+        if blue.sysinfo.os.platform == blue.OsPlatform.OSX and blue.sysinfo.os.majorVersion == 10 and blue.sysinfo.os.minorVersion <= 14 and _IsIntelGPU():
+            logger.warn('Disabling GPU particles because of issues with Intel GPUs on macOS 10.14')
+            currentSettings["gpuParticles"] = False
 
         return currentSettings
 
@@ -854,7 +861,10 @@ class SceneRenderJobSpace(SceneRenderJobBase):
 
     def SetSSAOBasedOnSettings(self):
         scene = self.GetScene()
-        if self.aoSetting == gfxsettings.GFX_AO_QUALITY_OFF or trinity.GetShaderModel() == 'SM_3_0_LO':
+
+        forceDisable = not CanSupportSsao()
+
+        if forceDisable or self.aoSetting == gfxsettings.GFX_AO_QUALITY_OFF or trinity.GetShaderModel() == 'SM_3_0_LO':
             scene.SSAO.enabled = False
         else:
             scene.SSAO.enabled = True
