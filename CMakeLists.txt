@@ -4,6 +4,7 @@ project(d3dinfo VERSION 1.0.0)
 include(cmake/CcpBuildConfigurations.cmake)
 include(cmake/CcpTargetConfigurations.cmake)
 include(cmake/CcpPackageConfigHelpers.cmake)
+include(cmake/CcpMonolithVendorConfig.cmake)
 include(CMakePackageConfigHelpers)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
