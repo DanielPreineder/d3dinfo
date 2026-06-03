@@ -1,3 +1,4 @@
+# Copyright © 2014 CCP ehf.
 import sys
 import os
 from six.moves import getcwd
